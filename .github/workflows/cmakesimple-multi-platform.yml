@@ -1,4 +1,4 @@
-name: Simple SO Maker
+aname: Simple SO Maker
 
 on:
   workflow_dispatch:
