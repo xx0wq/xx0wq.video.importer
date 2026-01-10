@@ -1,0 +1,23 @@
+{
+  "geode": "4.10.0",
+  "id": "xx0wq.video.importer",
+  "name": "Video Importer (Object Video)",
+  "version": "1.0.0",
+  "developer": "xx0wq",
+  "description": "Import MP4 in the editor, select FPS, auto-quantize (CIELAB) and play video using grouped color channels and a single sprite grid.",
+  "resources": {
+    "pixel": "resources/pixel.png"
+  },
+  "dependencies": [],
+  "entry": [],
+  "platforms": ["android", "windows", "macos", "ios"],
+  "gd": {
+    "android": "2.2074",
+    "windows": "2.207",
+    "macos": "2.207",
+    "ios": "2.207"
+  },
+  "mappings": {
+    "classes": []
+  }
+}
