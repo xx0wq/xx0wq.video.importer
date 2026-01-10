@@ -1,13 +1,109 @@
-- name: Build (${{ matrix.abi }})
-  run: |
-    mkdir build-${{ matrix.abi }}
-    cd build-${{ matrix.abi }}
-    cmake .. \
-      -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
-      -DANDROID_ABI=${{ matrix.abi }} \
-      -DANDROID_PLATFORM=android-21 \
-      -DCMAKE_BUILD_TYPE=Release
-    make -j$(nproc)
+name: Cross-platform Geode mod build
 
-    # Verify output
-    ls -l
+on:
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+
+      - name: Fetch temp deps
+        run: |
+          # Example: fetch FFmpegKit headers or other repos you need
+          git clone --depth=1 https://github.com/arthenica/ffmpeg-kit.git temp_ffmpeg
+          mkdir -p thirdparty/ffmpeg/include
+          cp -r temp_ffmpeg/ffmpeg-kit/ffmpeg/src/main/cpp/ffmpeg/* thirdparty/ffmpeg/include/
+
+      - name: Build Android (${{ matrix.abi }})
+        run: |
+          mkdir build-${{ matrix.abi }}
+          cd build-${{ matrix.abi }}
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=${{ matrix.abi }} \
+            -DANDROID_PLATFORM=android-21 \
+            -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+
+          cd ..
+          mkdir -p bin
+          if [ "${{ matrix.abi }}" = "arm64-v8a" ]; then
+            mkdir -p bin/android64
+            cp build-${{ matrix.abi }}/libvideo_importer.so bin/android64/xx0wq.video.importer.so
+          else
+            mkdir -p bin/android32
+            cp build-${{ matrix.abi }}/libvideo_importer.so bin/android32/xx0wq.video.importer.so
+          fi
+
+      - name: Cleanup temp deps
+        run: rm -rf temp_ffmpeg thirdparty
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: geode-android-${{ matrix.abi }}
+          path: bin/
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch temp deps
+        run: git clone --depth=1 https://github.com/arthenica/ffmpeg-kit.git temp_ffmpeg
+
+      - name: Build Windows
+        run: |
+          mkdir build-win64
+          cd build-win64
+          cmake .. -A x64 -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+
+          cd ..
+          mkdir -p bin/win64
+          copy build-win64\\Release\\video_importer.dll bin\\win64\\xx0wq.video.importer.dll
+
+      - name: Cleanup temp deps
+        run: rmdir /s /q temp_ffmpeg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: geode-win64
+          path: bin/
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch temp deps
+        run: git clone --depth=1 https://github.com/arthenica/ffmpeg-kit.git temp_ffmpeg
+
+      - name: Build macOS
+        run: |
+          mkdir build-macos
+          cd build-macos
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(sysctl -n hw.ncpu)
+
+          cd ..
+          mkdir -p bin/macos
+          cp build-macos/libvideo_importer.dylib bin/macos/xx0wq.video.importer.dylib
+
+      - name: Cleanup temp deps
+        run: rm -rf temp_ffmpeg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: geode-macos
+          path: bin/
