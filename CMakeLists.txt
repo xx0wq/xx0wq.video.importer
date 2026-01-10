@@ -9,7 +9,6 @@ add_library(video_importer SHARED
 # Android logging library (safe to include everywhere)
 find_library(log-lib log)
 
-# Link against system log (Android) or nothing extra (Windows/macOS)
 if(log-lib)
     target_link_libraries(video_importer ${log-lib})
 endif()
