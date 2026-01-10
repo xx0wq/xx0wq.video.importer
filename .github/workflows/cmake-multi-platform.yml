@@ -1,50 +1,73 @@
-name: Build Geode Mod (Android)
+name: Auto-build .so (Android, no vendored deps)
 
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  build-android64:
+  build:
     runs-on: ubuntu-latest
-    name: Android 64-bit
+    strategy:
+      matrix:
+        abi: [ arm64-v8a, armeabi-v7a ]
+    env:
+      # FFmpegKit Maven coordinates (your 1.0.2)
+      FFMPEGKIT_GROUP: io/github/xch168
+      FFMPEGKIT_ARTIFACT: ffmpeg-kit-full-gpl
+      FFMPEGKIT_VERSION: 1.0.2
+      # FFmpeg headers version (pin to 6.0 as a sane default)
+      FFMPEG_HEADERS_VERSION: 6.0
     steps:
-    - uses: actions/checkout@v3
-    - uses: nttld/setup-ndk@v1
-      with:
-        ndk-version: r26d
-    - name: Configure & Build (arm64-v8a)
-      run: |
-        mkdir build64
-        cd build64
-        cmake .. \
-          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
-          -DANDROID_ABI=arm64-v8a \
-          -DANDROID_PLATFORM=android-21
-        make
-    - uses: actions/upload-artifact@v4
-      with:
-        name: android64-so
-        path: build64/libvideo_importer.so
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  build-android32:
-    runs-on: ubuntu-latest
-    name: Android 32-bit
-    steps:
-    - uses: actions/checkout@v3
-    - uses: nttld/setup-ndk@v1
-      with:
-        ndk-version: r26d
-    - name: Configure & Build (armeabi-v7a)
-      run: |
-        mkdir build32
-        cd build32
-        cmake .. \
-          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
-          -DANDROID_ABI=armeabi-v7a \
-          -DANDROID_PLATFORM=android-21
-        make
-    - uses: actions/upload-artifact@v4
-      with:
-        name: android32-so
-        path: build32/libvideo_importer.so
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+
+      - name: Prepare deps (download AAR and headers)
+        run: |
+          set -e
+          mkdir -p thirdparty/ffmpeg/include thirdparty/ffmpeg/lib/${{ matrix.abi }}
+
+          # Download FFmpegKit AAR
+          AAR_URL="https://repo1.maven.org/maven2/${{ env.FFMPEGKIT_GROUP }}/${{ env.FFMPEGKIT_ARTIFACT }}/${{ env.FFMPEGKIT_VERSION }}/${{ env.FFMPEGKIT_ARTIFACT }}-${{ env.FFMPEGKIT_VERSION }}.aar"
+          curl -L "$AAR_URL" -o ffmpegkit.aar
+
+          # Extract .so from AAR
+          unzip -q ffmpegkit.aar -d ffmpegkit_aar
+          cp ffmpegkit_aar/jni/${{ matrix.abi }}/*.so thirdparty/ffmpeg/lib/${{ matrix.abi }}/
+
+          # Download FFmpeg source headers (tarball)
+          curl -L "https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_HEADERS_VERSION }}.tar.xz" -o ffmpeg.tar.xz
+          mkdir ffmpeg_src && tar -xJf ffmpeg.tar.xz -C ffmpeg_src
+          # Copy header dirs
+          cp -r ffmpeg_src/ffmpeg-${{ env.FFMPEG_HEADERS_VERSION }}/libavcodec thirdparty/ffmpeg/include/
+          cp -r ffmpeg_src/ffmpeg-${{ env.FFMPEG_HEADERS_VERSION }}/libavformat thirdparty/ffmpeg/include/
+          cp -r ffmpeg_src/ffmpeg-${{ env.FFMPEG_HEADERS_VERSION }}/libavutil thirdparty/ffmpeg/include/
+          cp -r ffmpeg_src/ffmpeg-${{ env.FFMPEG_HEADERS_VERSION }}/libswscale thirdparty/ffmpeg/include/
+          # Optional (if you use them)
+          if [ -d ffmpeg_src/ffmpeg-${{ env.FFMPEG_HEADERS_VERSION }}/libswresample ]; then
+            cp -r ffmpeg_src/ffmpeg-${{ env.FFMPEG_HEADERS_VERSION }}/libswresample thirdparty/ffmpeg/include/
+          fi
+
+      - name: Configure & build (${{ matrix.abi }})
+        run: |
+          mkdir build-${{ matrix.abi }}
+          cd build-${{ matrix.abi }}
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=${{ matrix.abi }} \
+            -DANDROID_PLATFORM=android-21 \
+            -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+
+      - name: Upload artifact (${{ matrix.abi }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: so-${{ matrix.abi }}
+          path: |
+            build-${{ matrix.abi }}/lib*.so
+            build-${{ matrix.abi }}/*.so
