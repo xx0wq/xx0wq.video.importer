@@ -1,0 +1,21 @@
+name: Simple SO Maker
+
+on:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build .so with gcc
+        run: |
+          mkdir -p build bin/linux64
+          gcc -shared -fPIC src/VideoImporter.cpp -o build/libvideo_importer.so
+          cp build/libvideo_importer.so bin/linux64/xx0wq.video.importer.so
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-so
+          path: bin/linux64/xx0wq.video.importer.so
