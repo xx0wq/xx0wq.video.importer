@@ -1,4 +1,4 @@
-name: Cross-platform Geode mod build
+name: Geode Mod Build
 
 on:
   workflow_dispatch:
@@ -17,13 +17,6 @@ jobs:
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26d
-
-      - name: Fetch temp deps
-        run: |
-          # Example: fetch FFmpegKit headers or other repos you need
-          git clone --depth=1 https://github.com/arthenica/ffmpeg-kit.git temp_ffmpeg
-          mkdir -p thirdparty/ffmpeg/include
-          cp -r temp_ffmpeg/ffmpeg-kit/ffmpeg/src/main/cpp/ffmpeg/* thirdparty/ffmpeg/include/
 
       - name: Build Android (${{ matrix.abi }})
         run: |
@@ -46,9 +39,6 @@ jobs:
             cp build-${{ matrix.abi }}/libvideo_importer.so bin/android32/xx0wq.video.importer.so
           fi
 
-      - name: Cleanup temp deps
-        run: rm -rf temp_ffmpeg thirdparty
-
       - uses: actions/upload-artifact@v4
         with:
           name: geode-android-${{ matrix.abi }}
@@ -58,9 +48,6 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Fetch temp deps
-        run: git clone --depth=1 https://github.com/arthenica/ffmpeg-kit.git temp_ffmpeg
 
       - name: Build Windows
         run: |
@@ -73,9 +60,6 @@ jobs:
           mkdir -p bin/win64
           copy build-win64\\Release\\video_importer.dll bin\\win64\\xx0wq.video.importer.dll
 
-      - name: Cleanup temp deps
-        run: rmdir /s /q temp_ffmpeg
-
       - uses: actions/upload-artifact@v4
         with:
           name: geode-win64
@@ -85,9 +69,6 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Fetch temp deps
-        run: git clone --depth=1 https://github.com/arthenica/ffmpeg-kit.git temp_ffmpeg
 
       - name: Build macOS
         run: |
@@ -99,9 +80,6 @@ jobs:
           cd ..
           mkdir -p bin/macos
           cp build-macos/libvideo_importer.dylib bin/macos/xx0wq.video.importer.dylib
-
-      - name: Cleanup temp deps
-        run: rm -rf temp_ffmpeg
 
       - uses: actions/upload-artifact@v4
         with:
