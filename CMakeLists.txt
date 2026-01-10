@@ -1,31 +1,22 @@
-cmake_minimum_required(VERSION 3.20)
-project(denys_video_importer)
+# Headers fetched at build time
+include_directories(${CMAKE_SOURCE_DIR}/thirdparty/ffmpeg/include)
 
-set(CMAKE_CXX_STANDARD 17)
+# Choose the AAR-extracted .so by ABI
+if(${CMAKE_ANDROID_ARCH_ABI} STREQUAL "arm64-v8a")
+    set(FFMPEG_LIB_DIR ${CMAKE_SOURCE_DIR}/thirdparty/ffmpeg/lib/arm64-v8a)
+elseif(${CMAKE_ANDROID_ARCH_ABI} STREQUAL "armeabi-v7a")
+    set(FFMPEG_LIB_DIR ${CMAKE_SOURCE_DIR}/thirdparty/ffmpeg/lib/armeabi-v7a)
+endif()
 
-# Geode
-find_package(Geode REQUIRED)
-add_library(denys_video_importer SHARED
+# Import the merged libffmpeg.so from FFmpegKit
+add_library(ffmpeg SHARED IMPORTED)
+set_target_properties(ffmpeg PROPERTIES IMPORTED_LOCATION ${FFMPEG_LIB_DIR}/libffmpeg.so)
+
+# Your library
+add_library(video_importer SHARED
     src/VideoImporter.cpp
+    # add your source files here
 )
 
-target_include_directories(denys_video_importer PRIVATE
-    ${GEODE_INCLUDE_DIR}
-    thirdparty/ffmpeg/include
-)
-
-# Link FFmpeg (adjust paths or use find_package if available)
-target_link_directories(denys_video_importer PRIVATE
-    thirdparty/ffmpeg/lib
-)
-
-target_link_libraries(denys_video_importer
-    Geode
-    avformat
-    avcodec
-    swscale
-    avutil
-)
-
-# Android exports
-geode_link_mod(denys_video_importer)
+# Link
+target_link_libraries(video_importer ffmpeg)

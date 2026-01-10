@@ -10,7 +10,14 @@
   },
   "dependencies": [],
   "entry": [],
-  "platforms": ["android", "windows", "macos", "ios"],
+  "icon": "icon.png"
+  "platforms": {
+    "android64": "xx0wq.video.importer.android64.so",
+    "android32": "xx0wq.video.importer.android32.so",
+    "windows": "xx0wq.video.importer.windows.dll",
+    "macos": "xx0wq.video.importer.macos.dylib",
+    "ios": "xx0wq.video.importer.ios.dylib"
+  },
   "gd": {
     "android": "2.2074",
     "windows": "2.207",
