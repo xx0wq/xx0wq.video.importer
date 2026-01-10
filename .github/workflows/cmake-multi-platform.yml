@@ -1,4 +1,4 @@
-name: Build Geode Mod (Multi-platform)
+name: Build Geode Mod (Android)
 
 on:
   push:
@@ -13,14 +13,10 @@ jobs:
     - uses: nttld/setup-ndk@v1
       with:
         ndk-version: r26d
-    - name: Download FFmpeg
+    - name: Configure & Build (arm64-v8a)
       run: |
-        mkdir -p thirdparty/ffmpeg/include thirdparty/ffmpeg/lib
-        curl -L https://nightly.link/BtbN/FFmpeg-Builds/workflows/linux/main/ffmpeg-master.tar.xz | tar -xJ --strip-components=1 -C thirdparty/ffmpeg
-    - name: Build
-      run: |
-        mkdir build
-        cd build
+        mkdir build64
+        cd build64
         cmake .. \
           -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
           -DANDROID_ABI=arm64-v8a \
@@ -28,8 +24,8 @@ jobs:
         make
     - uses: actions/upload-artifact@v4
       with:
-        name: android64-binary
-        path: build/libdenys_video_importer.so
+        name: android64-so
+        path: build64/libvideo_importer.so
 
   build-android32:
     runs-on: ubuntu-latest
@@ -39,11 +35,7 @@ jobs:
     - uses: nttld/setup-ndk@v1
       with:
         ndk-version: r26d
-    - name: Download FFmpeg
-      run: |
-        mkdir -p thirdparty/ffmpeg/include thirdparty/ffmpeg/lib
-        curl -L https://nightly.link/BtbN/FFmpeg-Builds/workflows/linux/main/ffmpeg-master.tar.xz | tar -xJ --strip-components=1 -C thirdparty/ffmpeg
-    - name: Build
+    - name: Configure & Build (armeabi-v7a)
       run: |
         mkdir build32
         cd build32
@@ -54,29 +46,5 @@ jobs:
         make
     - uses: actions/upload-artifact@v4
       with:
-        name: android32-binary
-        path: build32/libdenys_video_importer.so
-
-  build-windows:
-    runs-on: windows-latest
-    name: Windows
-    steps:
-    - uses: actions/checkout@v3
-    - uses: ilammy/msvc-dev-cmd@v1
-    - name: Download FFmpeg
-      run: |
-        curl -L -o ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-release-full.7z
-        7z x ffmpeg.zip -o./ffmpeg
-        mkdir thirdparty/ffmpeg/include thirdparty/ffmpeg/lib
-        copy ffmpeg/include/* thirdparty/ffmpeg/include/
-        copy ffmpeg/lib/* thirdparty/ffmpeg/lib/
-    - name: Build
-      run: |
-        mkdir build
-        cd build
-        cmake .. -G "NMake Makefiles"
-        nmake
-    - uses: actions/upload-artifact@v4
-      with:
-        name: windows-binary
-        path: build/denys_video_importer.dll
+        name: android32-so
+        path: build32/libvideo_importer.so
