@@ -1,0 +1,6 @@
+- name: Download FFmpegKit AAR
+  run: |
+    curl -L "https://repo1.maven.org/maven2/io/github/xch168/ffmpeg-kit-full-gpl/1.0.2/ffmpeg-kit-full-gpl-1.0.2.aar" -o ffmpegkit.aar
+    unzip -q ffmpegkit.aar -d temp_ffmpeg
+    mkdir -p thirdparty/ffmpeg/lib/${{ matrix.abi }}
+    cp temp_ffmpeg/jni/${{ matrix.abi }}/*.so thirdparty/ffmpeg/lib/${{ matrix.abi }}/
