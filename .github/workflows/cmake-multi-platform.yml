@@ -6,8 +6,8 @@ on:
 
 permissions:
   contents: write    # allow creating releases and uploading assets
-  actions: read      # allow downloading artifacts
-  id-token: write    # optional, for OIDC if you use cloud deploys
+  actions: read
+  id-token: write
 
 jobs:
   setup:
@@ -19,15 +19,9 @@ jobs:
         run: |
           mkdir -p setup/include
           unzip -q setup/geode.zip -d setup/tmp
-          # Move headers into the correct place
-          if [ -d "setup/tmp/loader/include/geode" ]; then
-            mv setup/tmp/loader/include/geode setup/include/Geode
-          elif [ -d "setup/tmp/include/geode" ]; then
-            mv setup/tmp/include/geode setup/include/Geode
-          fi
-          # Normalize casing for Geode.hpp
-          if [ -f "setup/include/Geode/geode.hpp" ]; then
-            mv setup/include/Geode/geode.hpp setup/include/Geode/Geode.hpp
+          # Move headers from loader/Include/Geode into setup/include/Geode
+          if [ -d "setup/tmp/loader/Include/Geode" ]; then
+            mv setup/tmp/loader/Include/Geode setup/include/
           fi
           ls -R setup/include
 
@@ -140,11 +134,11 @@ jobs:
       - name: Create release zip
         run: |
           mkdir -p release
-          cp dist/android32-binary/*.so release/video-importer-android32.so
-          cp dist/android64-binary/*.so release/video-importer-android64.so
-          cp dist/win64-binary/*.dll release/video-importer-win64.dll
-          cp dist/macos-binary/*.dylib release/video-importer-macos.dylib
-          cp dist/ios-binary/*.dylib release/video-importer-ios.dylib
+          cp dist/android32-binary/*.so release/xx0wq.video.importer.android32.so
+          cp dist/android64-binary/*.so release/xx0wq.video.importer.android64.so
+          cp dist/win64-binary/*.dll release/xx0wq.video.importer.win64.dll
+          cp dist/macos-binary/*.dylib release/xx0wq.video.importer.macos.dylib
+          cp dist/ios-binary/*.dylib release/xx0wq.video.importer.ios.dylib
           zip -r video-importer-${{ github.run_number }}.zip release
 
       - name: Publish GitHub Release
