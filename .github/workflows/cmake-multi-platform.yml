@@ -4,19 +4,36 @@ on:
   push:
     branches: [main, master]
 
-permissions:
-  contents: write
-  actions: read
-  id-token: write
-
 jobs:
+  # Shared step template for header check
+  ensure-geode-headers: &ensure-geode-headers
+    run: |
+      if [ ! -f "setup/include/Geode/Enums.hpp" ] || \
+         [ ! -f "setup/include/Geode/platform/cplatform.h" ] || \
+         [ ! -f "setup/include/Geode/c++stl/gdstdlib.hpp" ]; then
+        echo "Geode headers incomplete, downloading full SDK..."
+        rm -rf setup/include/Geode
+        mkdir -p setup/include
+        git clone --depth=1 https://github.com/geode-sdk/bindings.git tmp_bindings
+        cp -r tmp_bindings/include/Geode setup/include/
+        rm -rf tmp_bindings
+      else
+        echo "Geode headers already present."
+      fi
+
   build-android64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
-      - run: cmake -B build -S . -DANDROID_ABI=arm64-v8a -DGEODE_SDK_DIR=$PWD/setup
-      - run: cmake --build build --config Release
+      - name: Ensure Geode SDK headers
+        <<: *ensure-geode-headers
+      - name: Install FFmpeg dev libraries
+        run: sudo apt-get update && sudo apt-get install -y \
+          libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
+      - name: Configure CMake
+        run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup -DGEODE_PLATFORM_ANDROID=1
+      - name: Build
+        run: cmake --build build --config Release
       - uses: actions/upload-artifact@v4
         with:
           name: android64-binary
@@ -26,9 +43,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
-      - run: cmake -B build -S . -DANDROID_ABI=armeabi-v7a -DGEODE_SDK_DIR=$PWD/setup
-      - run: cmake --build build --config Release
+      - name: Ensure Geode SDK headers
+        <<: *ensure-geode-headers
+      - name: Install FFmpeg dev libraries
+        run: sudo apt-get update && sudo apt-get install -y \
+          libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
+      - name: Configure CMake
+        run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup -DGEODE_PLATFORM_ANDROID=1
+      - name: Build
+        run: cmake --build build --config Release
       - uses: actions/upload-artifact@v4
         with:
           name: android32-binary
@@ -38,8 +61,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup
-      - run: cmake --build build --config Release
+      - name: Ensure Geode SDK headers
+        shell: bash
+        <<: *ensure-geode-headers
+      - name: Configure CMake
+        run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup -DGEODE_PLATFORM_WINDOWS=1
+      - name: Build
+        run: cmake --build build --config Release
       - uses: actions/upload-artifact@v4
         with:
           name: win64-binary
@@ -49,9 +77,14 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: brew install ffmpeg pkg-config
-      - run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup
-      - run: cmake --build build --config Release
+      - name: Ensure Geode SDK headers
+        <<: *ensure-geode-headers
+      - name: Install FFmpeg
+        run: brew install ffmpeg pkg-config
+      - name: Configure CMake
+        run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup -DGEODE_PLATFORM_MACOS=1
+      - name: Build
+        run: cmake --build build --config Release
       - uses: actions/upload-artifact@v4
         with:
           name: macos-binary
@@ -61,9 +94,14 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: brew install ffmpeg pkg-config
-      - run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup
-      - run: cmake --build build --config Release
+      - name: Ensure Geode SDK headers
+        <<: *ensure-geode-headers
+      - name: Install FFmpeg
+        run: brew install ffmpeg pkg-config
+      - name: Configure CMake
+        run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup -DGEODE_PLATFORM_IOS=1
+      - name: Build
+        run: cmake --build build --config Release
       - uses: actions/upload-artifact@v4
         with:
           name: ios-binary
@@ -80,12 +118,10 @@ jobs:
     if: startsWith(github.event.head_commit.message, 'release ')
     steps:
       - uses: actions/checkout@v4
-
       - name: Download all binaries
         uses: actions/download-artifact@v4
         with:
           path: dist
-
       - name: Create release zip
         run: |
           mkdir -p release
@@ -95,7 +131,6 @@ jobs:
           cp dist/macos-binary/*.dylib release/xx0wq.video.importer.macos.dylib
           cp dist/ios-binary/*.dylib release/xx0wq.video.importer.ios.dylib
           zip -r video-importer-${{ github.run_number }}.zip release
-
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v1
         with:
