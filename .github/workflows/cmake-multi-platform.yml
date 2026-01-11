@@ -1,10 +1,56 @@
-name: Geode Mod SO Build
+name: Geode Mod Build & Release
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'   # e.g. v0.7.0, v0.7.1, v0.8.0
 
 jobs:
-  android:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set version in mod.json
+        run: |
+          $VERSION="${env:GITHUB_REF_NAME}".Substring(1)
+          jq --arg ver "$VERSION" '.version = $ver' mod.json > mod.json.tmp
+          mv mod.json.tmp mod.json
+      - name: Configure & Build Windows
+        run: |
+          mkdir build-win64
+          cd build-win64
+          cmake .. -A x64
+          cmake --build . --config Release
+      - name: Copy binary
+        run: copy build-win64\\Release\\*.dll .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win64-binary
+          path: xx0wq.video.importer.win64.dll
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set version in mod.json
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          jq --arg ver "$VERSION" '.version = $ver' mod.json > mod.json.tmp && mv mod.json.tmp mod.json
+      - name: Configure & Build macOS
+        run: |
+          mkdir build-macos
+          cd build-macos
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+      - name: Copy binary
+        run: cp build-macos/*.dylib .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-binary
+          path: xx0wq.video.importer.macos.dylib
+
+  build-android:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -14,6 +60,10 @@ jobs:
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26d
+      - name: Set version in mod.json
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          jq --arg ver "$VERSION" '.version = $ver' mod.json > mod.json.tmp && mv mod.json.tmp mod.json
       - name: Configure & Build Android (${{ matrix.abi }})
         run: |
           mkdir build-${{ matrix.abi }}
@@ -24,47 +74,23 @@ jobs:
             -DANDROID_PLATFORM=android-21 \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build . --config Release
+      - name: Copy binary
+        run: cp build-${{ matrix.abi }}/*.so .
       - uses: actions/upload-artifact@v4
         with:
-          name: geode-android-${{ matrix.abi }}
+          name: android-${{ matrix.abi }}-binary
           path: xx0wq.video.importer.android*.so
 
-  windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Configure & Build Windows
-        run: |
-          mkdir build-win64
-          cd build-win64
-          cmake .. -A x64
-          cmake --build . --config Release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: geode-win64
-          path: xx0wq.video.importer.win64.dll
-
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Configure & Build macOS
-        run: |
-          mkdir build-macos
-          cd build-macos
-          cmake .. -DCMAKE_BUILD_TYPE=Release
-          cmake --build . --config Release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: geode-macos
-          path: xx0wq.video.importer.macos.dylib
-
-  ios:
+  build-ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Fetch iOS toolchain
         run: curl -L https://raw.githubusercontent.com/leetal/ios-cmake/master/ios.toolchain.cmake -o ios.toolchain.cmake
+      - name: Set version in mod.json
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          jq --arg ver "$VERSION" '.version = $ver' mod.json > mod.json.tmp && mv mod.json.tmp mod.json
       - name: Configure & Build iOS
         run: |
           mkdir build-ios
@@ -74,7 +100,58 @@ jobs:
             -DPLATFORM=OS64 \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build . --config Release
+      - name: Copy binary
+        run: cp build-ios/*.dylib .
       - uses: actions/upload-artifact@v4
         with:
-          name: geode-ios
+          name: ios-binary
           path: xx0wq.video.importer.ios.dylib
+
+  package:
+    needs: [build-windows, build-macos, build-android, build-ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Create packages
+        run: |
+          mkdir dist/final
+          cp mod.json resources/* dist/
+          cd dist
+          zip -r final/video_importer.zip mod.json resources xx0wq.video.importer.*.dll xx0wq.video.importer.*.so xx0wq.video.importer.*.dylib
+          cp final/video_importer.zip final/xx0wq.video.importer.geode
+      - name: Generate checksums
+        run: |
+          cd dist/final
+          sha256sum video_importer.zip > video_importer.zip.sha256
+          sha256sum xx0wq.video.importer.geode > xx0wq.video.importer.geode.sha256
+          cat *.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video_importer-package
+          path: dist/final/*
+
+  release:
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: video_importer-package
+          path: dist/final
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/final/xx0wq.video.importer.geode
+            dist/final/xx0wq.video.importer.geode.sha256
+          body: |
+            ## Checksums
+            ```
+            $(cat dist/final/xx0wq.video.importer.geode.sha256)
+            $(cat dist/final/video_importer.zip.sha256)
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
