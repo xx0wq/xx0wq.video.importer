@@ -4,8 +4,8 @@
   "description": "Import MP4 videos into Geometry Dash with FPS and resolution controls. Generates realistic color triggers using HSV mapping for smooth playback.",
   "developer": "xx0wq",
   "version": "0.7.0",
-  "gameVersion": "2.2074",
-  "geodeVersion": "4.10.0",
+  "gd": "2.2074",
+  "geode": "4.10.0",
   "platforms": {
     "windows": "xx0wq.video.importer.win64.dll",
     "macos": "xx0wq.video.importer.macos.dylib",
