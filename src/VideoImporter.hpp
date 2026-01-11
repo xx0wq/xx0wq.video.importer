@@ -1,10 +1,12 @@
 #pragma once
-#include <string>
-extern "C" {
+
+// Only include FFmpeg on desktop platforms
+#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/avutil.h>
 #include <libswscale/swscale.h>
-}
+#endif
 
 class VideoImporter {
 public:

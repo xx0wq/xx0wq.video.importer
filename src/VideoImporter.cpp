@@ -12,18 +12,17 @@ extern "C" {
 VI_EXPORT bool VI_openImportDialog(EditorContext* ctx) {
     if (!ctx) return false;
 
-    // Ask for MP4 path
+#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)
+    // Desktop builds: full importer dialog with FFmpeg + cocos
     std::string path = Utils::openFileDialog("Select MP4 video", {"mp4"});
     if (path.empty()) {
         Utils::notify("No file selected.");
         return false;
     }
 
-    // Ask for FPS and resolution
     int fps = Utils::promptInt("Frames per second", 30, 1, 120);
     int res = Utils::promptInt("Resolution (blocks per axis)", 64, 8, 256);
 
-    // Decode frames
     VideoDecoder decoder;
     decoder.setTargetResolution(res, res);
     decoder.setTargetFPS(fps);
@@ -34,10 +33,14 @@ VI_EXPORT bool VI_openImportDialog(EditorContext* ctx) {
         return false;
     }
 
-    // Create objects + triggers
     bool ok = EditorIntegration::createObjectsAndTriggers(ctx, frames, fps, res);
     Utils::notify(ok ? "Video import complete." : "Import failed during object creation.");
     return ok;
+#else
+    // Mobile builds: stub implementation
+    Utils::notify("Video import is not available on this platform.");
+    return false;
+#endif
 }
 
 } // extern "C"
