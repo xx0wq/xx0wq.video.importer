@@ -7,66 +7,116 @@ on:
       - master
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  # --- 5 parallel build jobs ---
+  build-windows:
+    runs-on: windows-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Init submodules (if any)
-        run: git submodule update --init --recursive
-
+      - uses: actions/checkout@v4
       - name: Download Geode SDK
-        run: |
-          mkdir -p external
-          git clone --depth=1 https://github.com/geode-sdk/geode-sdk.git external/geode
-          echo "GEODE_SDK_DIR=$GITHUB_WORKSPACE/external/geode" >> $GITHUB_ENV
-
-      - name: Set up CMake
-        uses: jwlawson/actions-setup-cmake@v1.13
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            pkg-config \
-            libavcodec-dev \
-            libavformat-dev \
-            libavutil-dev \
-            libswscale-dev \
-            jq \
-            zip
-
+        run: git clone --depth=1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/geode-sdk/geode-sdk.git external/geode
       - name: Configure
-        run: cmake -B build -S .
-
+        run: cmake -B build -S . -DGEODE_SDK_DIR=external/geode
       - name: Build
         run: cmake --build build --config Release
-
-      - name: Package .zip
-        run: |
-          mkdir -p dist
-          cp -r build/* dist/
-          cp -r resources dist/
-          zip -r video_importer.zip dist
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: video_importer-build
-          path: video_importer.zip
+          name: win64-binary
+          path: build/*.dll
 
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Geode SDK
+        run: git clone --depth=1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/geode-sdk/geode-sdk.git external/geode
+      - name: Configure
+        run: cmake -B build -S . -DGEODE_SDK_DIR=external/geode
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-binary
+          path: build/*.dylib
+
+  build-android32:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Geode SDK
+        run: git clone --depth=1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/geode-sdk/geode-sdk.git external/geode
+      - name: Configure
+        run: cmake -B build -S . -DANDROID_ABI=armeabi-v7a -DGEODE_SDK_DIR=external/geode
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android32-binary
+          path: build/*.so
+
+  build-android64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Geode SDK
+        run: git clone --depth=1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/geode-sdk/geode-sdk.git external/geode
+      - name: Configure
+        run: cmake -B build -S . -DANDROID_ABI=arm64-v8a -DGEODE_SDK_DIR=external/geode
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android64-binary
+          path: build/*.so
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Geode SDK
+        run: git clone --depth=1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/geode-sdk/geode-sdk.git external/geode
+      - name: Configure
+        run: cmake -B build -S . -DGEODE_SDK_DIR=external/geode
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-binary
+          path: build/*.dylib
+
+  # --- 2 jobs after builds ---
+  package-all:
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos, build-android32, build-android64, build-ios]
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: collected
+      - name: Create combined zip
+        run: |
+          cd collected
+          zip -r video_importer_all.zip .
+      - name: Upload combined artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: video_importer-all
+          path: collected/video_importer_all.zip
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [package-all]
+    steps:
+      - uses: actions/checkout@v4
       - name: Check commit message
         id: commitmsg
         run: |
           COMMIT_MSG="$(git log -1 --pretty=%B)"
           echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-
-      - name: Skip release if commit says dont upload
-        if: contains(steps.commitmsg.outputs.message, 'dont upload')
-        run: echo "Skipping release due to commit message"
-
       - name: Extract release version
         id: version
         if: contains(steps.commitmsg.outputs.message, 'release')
@@ -74,23 +124,6 @@ jobs:
           VERSION=$(echo "${{ steps.commitmsg.outputs.message }}" | sed -n 's/.*release \([0-9]\+\).*/\1/p')
           FULL_VERSION="0.70.${VERSION}"
           echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Update mod.json version
-        if: contains(steps.commitmsg.outputs.message, 'release')
-        run: |
-          jq ".version = \"${{ steps.version.outputs.version }}\"" mod.json > mod.json.tmp
-          mv mod.json.tmp mod.json
-          echo "Updated mod.json version to ${{ steps.version.outputs.version }}"
-
-      - name: Commit updated mod.json
-        if: contains(steps.commitmsg.outputs.message, 'release')
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mod.json
-          git commit -m "chore: bump mod.json version to ${{ steps.version.outputs.version }}"
-          git push
-
       - name: Create Release
         if: contains(steps.commitmsg.outputs.message, 'release')
         uses: softprops/action-gh-release@v1
@@ -100,6 +133,6 @@ jobs:
           body: |
             Automated release build for commit:
             ${{ steps.commitmsg.outputs.message }}
-          files: video_importer.zip
+          files: collected/video_importer_all.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
