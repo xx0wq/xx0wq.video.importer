@@ -15,11 +15,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Normalize Geode headers
+      - name: Unpack Geode SDK
         run: |
           mkdir -p setup/include
-          if [ -d "setup/geode/include/geode" ]; then
-            mv setup/geode/include/geode setup/include/Geode
+          unzip -q setup/geode.zip -d setup/tmp
+          # Move headers into the correct place
+          if [ -d "setup/tmp/loader/include/geode" ]; then
+            mv setup/tmp/loader/include/geode setup/include/Geode
+          elif [ -d "setup/tmp/include/geode" ]; then
+            mv setup/tmp/include/geode setup/include/Geode
+          fi
+          # Normalize casing for Geode.hpp
+          if [ -f "setup/include/Geode/geode.hpp" ]; then
+            mv setup/include/Geode/geode.hpp setup/include/Geode/Geode.hpp
           fi
           ls -R setup/include
 
