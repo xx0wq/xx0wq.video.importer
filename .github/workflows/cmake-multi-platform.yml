@@ -140,7 +140,8 @@ jobs:
         with:
           name: android-${{ matrix.abi }}-binary
           path: build/xx0wq.video.importer.android*.so
-build-ios:
+
+  build-ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -156,8 +157,12 @@ build-ios:
           echo "#pragma once" > include/Geode/GeneratedBinding.hpp
       - name: Patch Geode headers to guard cocos/cocos2d/fmod
         run: |
-          awk '/#include <cocos-ext.h>/ {print "#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)"; print "#include <cocos-ext.h>"; print "#endif"; next} {print}' include/Geode/utils/addresser.hpp > include/Geode/utils/addresser.hpp.tmp && mv include/Geode/utils/addresser.hpp.tmp include/Geode/utils/addresser.hpp
-          awk '/#include <cocos-ext.h>/ {print "#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)"; print "#include <cocos-ext.h>"; next} /#include <cocos2d.h>/ {print "#include <cocos2d.h>"; next} /#include <fmod.hpp>/ {print "#include <fmod.hpp>"; print "#endif"; next} {print}' include/Geode/Bindings.hpp > include/Geode/Bindings.hpp.tmp && mv include/Geode/Bindings.hpp.tmp include/Geode/Bindings.hpp
+          awk '/#include <cocos-ext.h>/ {print "#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)"; print "#include <cocos-ext.h>"; next}
+               /#include <cocos2d.h>/   {print "#include <cocos2d.h>"; next}
+               /#include <fmod.hpp>/    {print "#include <fmod.hpp>"; print "#endif"; next}
+               {print}' include/Geode/Bindings.hpp > include/Geode/Bindings.hpp.tmp && mv include/Geode/Bindings.hpp.tmp include/Geode/Bindings.hpp
+          awk '/#include <cocos-ext.h>/ {print "#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)"; print "#include <cocos-ext.h>"; print "#endif"; next}
+               {print}' include/Geode/utils/addresser.hpp > include/Geode/utils/addresser.hpp.tmp && mv include/Geode/utils/addresser.hpp.tmp include/Geode/utils/addresser.hpp
       - name: Build iOS dylib
         run: |
           mkdir -p build
@@ -222,4 +227,4 @@ build-ios:
           draft: false
           prerelease: false
           files: |
-            dist/video_importer_${{ needs.package.outputs.version }}.zip
+            dist/video_importer_${{ needs.package.outputs.version }}.zip,
