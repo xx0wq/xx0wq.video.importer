@@ -8,7 +8,7 @@
   },
   "id": "xx0wq.video.importer",
   "name": "Video Importer",
-  "version": "0.70.1",
+  "version": "0.70.2",
   "developer": "xx0wq",
   "platforms": {
     "windows": "xx0wq.video.importer.win64.dll",
