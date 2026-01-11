@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cstdint>
 
 struct PixelRGB {
@@ -6,9 +7,9 @@ struct PixelRGB {
 };
 
 struct HSV {
-    float h; // 0..360
-    float s; // 0..1
-    float v; // 0..1
+    float h; // Hue: 0..360
+    float s; // Saturation: 0..1
+    float v; // Value: 0..1
 };
 
 namespace ColorMapper {
