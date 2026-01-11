@@ -4,13 +4,18 @@ on:
   push:
     branches: [main, master]
 
+permissions:
+  contents: write
+
 jobs:
   build-android64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Ensure Geode SDK headers
         run: |
+          set -e
           if [ ! -f "setup/include/Geode/Enums.hpp" ] || \
              [ ! -f "setup/include/Geode/platform/cplatform.h" ] || \
              [ ! -f "setup/include/Geode/c++stl/gdstdlib.hpp" ]; then
@@ -21,25 +26,69 @@ jobs:
             cp -r tmp_bindings/include/Geode setup/include/
             rm -rf tmp_bindings
           fi
+
       - name: Install FFmpeg dev libraries
-        run: sudo apt-get update && sudo apt-get install -y \
-          libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
-      - name: Configure CMake
-        run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup -DGEODE_PLATFORM_ANDROID=1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg pkg-config libavcodec-dev:amd64 libavformat-dev:amd64 libavutil-dev:amd64 libswscale-dev:amd64
+
+      - name: Configure CMake (Android 64)
+        run: cmake -B build -S . -DGEODE_SDK_DIR="$PWD/setup" -DGEODE_PLATFORM_ANDROID=1
+
       - name: Build
         run: cmake --build build --config Release
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: android64-binary
+          path: build/*.so
+
+  build-android32:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure Geode SDK headers
+        run: |
+          set -e
+          if [ ! -f "setup/include/Geode/Enums.hpp" ] || \
+             [ ! -f "setup/include/Geode/platform/cplatform.h" ] || \
+             [ ! -f "setup/include/Geode/c++stl/gdstdlib.hpp" ]; then
+            echo "Geode headers incomplete, downloading full SDK..."
+            rm -rf setup/include/Geode
+            mkdir -p setup/include
+            git clone --depth=1 https://github.com/geode-sdk/bindings.git tmp_bindings
+            cp -r tmp_bindings/include/Geode setup/include/
+            rm -rf tmp_bindings
+          fi
+
+      - name: Install FFmpeg dev libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg pkg-config libavcodec-dev:amd64 libavformat-dev:amd64 libavutil-dev:amd64 libswscale-dev:amd64
+
+      - name: Configure CMake (Android 32)
+        run: cmake -B build -S . -DGEODE_SDK_DIR="$PWD/setup" -DGEODE_PLATFORM_ANDROID=1
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android32-binary
           path: build/*.so
 
   build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Ensure Geode SDK headers
         shell: bash
         run: |
+          set -e
           if [ ! -f "setup/include/Geode/Enums.hpp" ] || \
              [ ! -f "setup/include/Geode/platform/cplatform.h" ] || \
              [ ! -f "setup/include/Geode/c++stl/gdstdlib.hpp" ]; then
@@ -50,11 +99,15 @@ jobs:
             cp -r tmp_bindings/include/Geode setup/include/
             rm -rf tmp_bindings
           fi
-      - name: Configure CMake
-        run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup -DGEODE_PLATFORM_WINDOWS=1
+
+      - name: Configure CMake (Windows)
+        run: cmake -B build -S . -DGEODE_SDK_DIR="$PWD/setup" -DGEODE_PLATFORM_WINDOWS=1
+
       - name: Build
         run: cmake --build build --config Release
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: win64-binary
           path: build/*.dll
@@ -63,8 +116,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Ensure Geode SDK headers
         run: |
+          set -e
           if [ ! -f "setup/include/Geode/Enums.hpp" ] || \
              [ ! -f "setup/include/Geode/platform/cplatform.h" ] || \
              [ ! -f "setup/include/Geode/c++stl/gdstdlib.hpp" ]; then
@@ -75,13 +130,89 @@ jobs:
             cp -r tmp_bindings/include/Geode setup/include/
             rm -rf tmp_bindings
           fi
+
       - name: Install FFmpeg
-        run: brew install ffmpeg pkg-config
-      - name: Configure CMake
-        run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup -DGEODE_PLATFORM_MACOS=1
+        run: brew update && brew install ffmpeg pkg-config
+
+      - name: Configure CMake (macOS)
+        run: cmake -B build -S . -DGEODE_SDK_DIR="$PWD/setup" -DGEODE_PLATFORM_MACOS=1
+
       - name: Build
         run: cmake --build build --config Release
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: macos-binary
           path: build/*.dylib
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure Geode SDK headers
+        run: |
+          set -e
+          if [ ! -f "setup/include/Geode/Enums.hpp" ] || \
+             [ ! -f "setup/include/Geode/platform/cplatform.h" ] || \
+             [ ! -f "setup/include/Geode/c++stl/gdstdlib.hpp" ]; then
+            echo "Geode headers incomplete, downloading full SDK..."
+            rm -rf setup/include/Geode
+            mkdir -p setup/include
+            git clone --depth=1 https://github.com/geode-sdk/bindings.git tmp_bindings
+            cp -r tmp_bindings/include/Geode setup/include/
+            rm -rf tmp_bindings
+          fi
+
+      - name: Install FFmpeg
+        run: brew update && brew install ffmpeg pkg-config
+
+      - name: Configure CMake (iOS)
+        run: cmake -B build -S . -DGEODE_SDK_DIR="$PWD/setup" -DGEODE_PLATFORM_IOS=1
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-binary
+          path: build/*.dylib
+
+  release:
+    runs-on: ubuntu-latest
+    needs:
+      - build-android32
+      - build-android64
+      - build-windows
+      - build-macos
+      - build-ios
+    if: startsWith(github.event.head_commit.message, 'release ')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Package release
+        run: |
+          set -e
+          mkdir -p release
+          cp dist/android32-binary/*.so release/xx0wq.video.importer.android32.so || true
+          cp dist/android64-binary/*.so release/xx0wq.video.importer.android64.so || true
+          cp dist/win64-binary/*.dll release/xx0wq.video.importer.win64.dll || true
+          cp dist/macos-binary/*.dylib release/xx0wq.video.importer.macos.dylib || true
+          cp dist/ios-binary/*.dylib release/xx0wq.video.importer.ios.dylib || true
+          zip -r video-importer-${{ github.run_number }}.zip release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Video Importer ${{ github.event.head_commit.message }}"
+          tag_name: "${{ github.event.head_commit.message }}"
+          files: video-importer-${{ github.run_number }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
