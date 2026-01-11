@@ -117,7 +117,7 @@ jobs:
           echo "\n**video_importer.zip**" >> checksums.txt
           cat video_importer.zip.sha256 >> checksums.txt
           echo "\n**xx0wq.video.importer.geode**" >> checksums.txt
-          cat xx0wq.video.importer.geode.sha256 >> checksums.txt
+          cat xx0wq.video_importer.geode.sha256 >> checksums.txt
 
       - uses: actions/upload-artifact@v4
         with:
