@@ -1,4 +1,4 @@
-name: Geode Mod Build
+name: Geode Mod SO Build
 
 on:
   workflow_dispatch:
@@ -9,14 +9,12 @@ jobs:
     strategy:
       matrix:
         abi: [arm64-v8a, armeabi-v7a]
-
     steps:
       - uses: actions/checkout@v4
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26d
-
-      - name: Build Android (${{ matrix.abi }})
+      - name: Configure & Build Android (${{ matrix.abi }})
         run: |
           mkdir build-${{ matrix.abi }}
           cd build-${{ matrix.abi }}
@@ -26,13 +24,6 @@ jobs:
             -DANDROID_PLATFORM=android-21 \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build . --config Release
-          cd ..
-          if [ "${{ matrix.abi }}" = "arm64-v8a" ]; then
-            cp build-${{ matrix.abi }}/libvideo_importer.so xx0wq.video.importer.android64.so
-          else
-            cp build-${{ matrix.abi }}/libvideo_importer.so xx0wq.video.importer.android32.so
-          fi
-
       - uses: actions/upload-artifact@v4
         with:
           name: geode-android-${{ matrix.abi }}
@@ -42,15 +33,12 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build Windows
+      - name: Configure & Build Windows
         run: |
           mkdir build-win64
           cd build-win64
-          cmake .. -A x64 -DCMAKE_BUILD_TYPE=Release
+          cmake .. -A x64
           cmake --build . --config Release
-          cd ..
-          copy build-win64\\Release\\video_importer.dll xx0wq.video.importer.win64.dll
-
       - uses: actions/upload-artifact@v4
         with:
           name: geode-win64
@@ -60,15 +48,12 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build macOS
+      - name: Configure & Build macOS
         run: |
           mkdir build-macos
           cd build-macos
           cmake .. -DCMAKE_BUILD_TYPE=Release
-          make -j$(sysctl -n hw.ncpu)
-          cd ..
-          cp build-macos/libvideo_importer.dylib xx0wq.video.importer.macos.dylib
-
+          cmake --build . --config Release
       - uses: actions/upload-artifact@v4
         with:
           name: geode-macos
@@ -78,18 +63,17 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build iOS (arm64)
+      - name: Fetch iOS toolchain
+        run: curl -L https://raw.githubusercontent.com/leetal/ios-cmake/master/ios.toolchain.cmake -o ios.toolchain.cmake
+      - name: Configure & Build iOS
         run: |
           mkdir build-ios
           cd build-ios
           cmake .. \
-            -DCMAKE_TOOLCHAIN_FILE=$PWD/ios.toolchain.cmake \
+            -DCMAKE_TOOLCHAIN_FILE=$PWD/../ios.toolchain.cmake \
             -DPLATFORM=OS64 \
             -DCMAKE_BUILD_TYPE=Release
-          make -j$(sysctl -n hw.ncpu)
-          cd ..
-          cp build-ios/libvideo_importer.dylib xx0wq.video.importer.ios.dylib
-
+          cmake --build . --config Release
       - uses: actions/upload-artifact@v4
         with:
           name: geode-ios
