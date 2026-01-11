@@ -4,21 +4,23 @@ on:
   push:
     branches: [main, master]
 
+permissions:
+  contents: write    # allow creating releases and uploading assets
+  actions: read      # allow downloading artifacts
+  id-token: write    # optional, for OIDC if you use cloud deploys
+
 jobs:
   setup:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare setup folder
+      - name: Normalize Geode headers
         run: |
           mkdir -p setup/include
-          # Normalize lowercase 'geode' to uppercase 'Geode'
           if [ -d "setup/geode/include/geode" ]; then
-            mkdir -p setup/include
             mv setup/geode/include/geode setup/include/Geode
           fi
-          # Ensure Geode.hpp exists
           ls -R setup/include
 
       - uses: actions/upload-artifact@v4
@@ -109,3 +111,37 @@ jobs:
         with:
           name: ios-binary
           path: build/*.dylib
+
+  release:
+    runs-on: ubuntu-latest
+    needs:
+      - build-android32
+      - build-android64
+      - build-windows
+      - build-macos
+      - build-ios
+    if: startsWith(github.event.head_commit.message, 'release ')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create release zip
+        run: |
+          mkdir -p release
+          cp dist/android32-binary/*.so release/video-importer-android32.so
+          cp dist/android64-binary/*.so release/video-importer-android64.so
+          cp dist/win64-binary/*.dll release/video-importer-win64.dll
+          cp dist/macos-binary/*.dylib release/video-importer-macos.dylib
+          cp dist/ios-binary/*.dylib release/video-importer-ios.dylib
+          zip -r video-importer-${{ github.run_number }}.zip release
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Video Importer ${{ github.event.head_commit.message }}"
+          tag_name: "${{ github.event.head_commit.message }}"
+          files: video-importer-${{ github.run_number }}.zip
