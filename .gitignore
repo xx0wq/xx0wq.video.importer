@@ -1,0 +1,44 @@
+# Build directories
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/Makefile
+/*.cmake
+
+# Compiled binaries
+*.dll
+*.so
+*.dylib
+*.exe
+*.o
+*.obj
+*.lib
+*.pdb
+
+# Release artifacts
+/release/
+/dist/
+/video-importer-*.zip
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.DS_Store
+Thumbs.db
+
+# IDE/project files
+.vscode/
+.idea/
+*.sln
+*.vcxproj
+*.xcodeproj
+*.xcworkspace
+
+# Python/Node caches (if used in tooling)
+__pycache__/
+node_modules/
+
+# Ignore CI/CD workflows and SDK setup folder
+/.github/workflows/
+/setup/
