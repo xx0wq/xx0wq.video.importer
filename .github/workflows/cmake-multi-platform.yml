@@ -5,23 +5,67 @@ on:
     branches: [main, master]
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  setup:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download Geode SDK
+      - name: Prepare setup folder
         run: |
-          New-Item -ItemType Directory -Force external\geode | Out-Null
-          curl -L https://github.com/geode-sdk/geode/releases/download/v4.10.0/geode-v4.10.0-win.zip -o geode.zip
-          7z x geode.zip -oexternal/geode
-          "GEODE_SDK_DIR=$PWD/external/geode" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Download FFmpeg
-        run: |
-          curl -L https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z -o ffmpeg.7z
-          7z x ffmpeg.7z -oC:/ffmpeg
-          $dir = Get-ChildItem -Directory C:/ffmpeg | Select-Object -First 1
-          "FFMPEG_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - run: cmake -B build -S . -DGEODE_SDK_DIR=$env:GEODE_SDK_DIR
+          mkdir -p setup/include
+          # Download SDK source for headers
+          curl -L https://github.com/geode-sdk/geode/archive/refs/tags/v4.10.0.zip -o geode-src.zip
+          unzip -q geode-src.zip -d setup
+          # Move headers into setup/include/Geode
+          cp -r setup/geode-4.10.0/include/Geode setup/include/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: setup
+          path: setup
+
+  build-android64:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: setup
+          path: setup
+      - run: sudo apt-get update && sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
+      - run: cmake -B build -S . -DANDROID_ABI=arm64-v8a -DGEODE_SDK_DIR=$PWD/setup
+      - run: cmake --build build --config Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android64-binary
+          path: build/*.so
+
+  build-android32:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: setup
+          path: setup
+      - run: sudo apt-get update && sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
+      - run: cmake -B build -S . -DANDROID_ABI=armeabi-v7a -DGEODE_SDK_DIR=$PWD/setup
+      - run: cmake --build build --config Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android32-binary
+          path: build/*.so
+
+  build-windows:
+    runs-on: windows-latest
+    needs: setup
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: setup
+          path: setup
+      - run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup
       - run: cmake --build build --config Release
       - uses: actions/upload-artifact@v4
         with:
@@ -30,131 +74,34 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
+    needs: setup
     steps:
       - uses: actions/checkout@v4
-      - name: Download Geode SDK
-        run: |
-          mkdir -p external/geode
-          curl -L https://github.com/geode-sdk/geode/releases/download/v4.10.0/geode-v4.10.0-mac.zip -o geode.zip
-          unzip -q geode.zip -d external/geode
-          echo "GEODE_SDK_DIR=$PWD/external/geode" >> $GITHUB_ENV
+      - uses: actions/download-artifact@v4
+        with:
+          name: setup
+          path: setup
       - run: brew install ffmpeg pkg-config
-      - run: cmake -B build -S . -DGEODE_SDK_DIR=$GEODE_SDK_DIR
+      - run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup
       - run: cmake --build build --config Release
       - uses: actions/upload-artifact@v4
         with:
           name: macos-binary
           path: build/*.dylib
 
-  build-android32:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download Geode SDK
-        run: |
-          mkdir -p external/geode
-          curl -L https://github.com/geode-sdk/geode/releases/download/v4.10.0/geode-v4.10.0-android32.zip -o geode.zip
-          unzip -q geode.zip -d external/geode
-          echo "GEODE_SDK_DIR=$PWD/external/geode" >> $GITHUB_ENV
-      - run: sudo apt-get update && sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
-      - run: cmake -B build -S . -DANDROID_ABI=armeabi-v7a -DGEODE_SDK_DIR=$GEODE_SDK_DIR
-      - run: cmake --build build --config Release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android32-binary
-          path: build/*.so
-
-  build-android64:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download Geode SDK
-        run: |
-          mkdir -p external/geode
-          curl -L https://github.com/geode-sdk/geode/releases/download/v4.10.0/geode-v4.10.0-android64.zip -o geode.zip
-          unzip -q geode.zip -d external/geode
-          echo "GEODE_SDK_DIR=$PWD/external/geode" >> $GITHUB_ENV
-      - run: sudo apt-get update && sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
-      - run: cmake -B build -S . -DANDROID_ABI=arm64-v8a -DGEODE_SDK_DIR=$GEODE_SDK_DIR
-      - run: cmake --build build --config Release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android64-binary
-          path: build/*.so
-
   build-ios:
     runs-on: macos-latest
+    needs: setup
     steps:
       - uses: actions/checkout@v4
-      - name: Download Geode SDK
-        run: |
-          mkdir -p external/geode
-          curl -L https://github.com/geode-sdk/geode/releases/download/v4.10.0/geode-v4.10.0-ios.zip -o geode.zip
-          unzip -q geode.zip -d external/geode
-          echo "GEODE_SDK_DIR=$PWD/external/geode" >> $GITHUB_ENV
+      - uses: actions/download-artifact@v4
+        with:
+          name: setup
+          path: setup
       - run: brew install ffmpeg pkg-config
-      - run: cmake -B build -S . -DGEODE_SDK_DIR=$GEODE_SDK_DIR
+      - run: cmake -B build -S . -DGEODE_SDK_DIR=$PWD/setup
       - run: cmake --build build --config Release
       - uses: actions/upload-artifact@v4
         with:
           name: ios-binary
           path: build/*.dylib
-
-  package-all:
-    runs-on: ubuntu-latest
-    needs: [build-windows, build-macos, build-android32, build-android64, build-ios]
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: collected
-      - run: |
-          cd collected
-          zip -r video_importer_all.zip .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: video_importer-all
-          path: collected/video_importer_all.zip
-
-  release:
-    runs-on: ubuntu-latest
-    needs: [package-all]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check commit message
-        id: commitmsg
-        run: |
-          COMMIT_MSG="$(git log -1 --pretty=%B)"
-          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-      - name: Extract release version
-        id: version
-        if: contains(steps.commitmsg.outputs.message, 'release')
-        run: |
-          VERSION=$(echo "${{ steps.commitmsg.outputs.message }}" | sed -n 's/.*release \([0-9]\+\).*/\1/p')
-          FULL_VERSION="0.70.${VERSION}"
-          echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
-      - name: Update mod.json version
-        if: contains(steps.commitmsg.outputs.message, 'release')
-        run: |
-          jq ".version = \"${{ steps.version.outputs.version }}\"" mod.json > mod.json.tmp
-          mv mod.json.tmp mod.json
-      - name: Commit updated mod.json
-        if: contains(steps.commitmsg.outputs.message, 'release')
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mod.json
-          git commit -m "chore: bump mod.json version to ${{ steps.version.outputs.version }}"
-          git push
-      - name: Create Release
-        if: contains(steps.commitmsg.outputs.message, 'release')
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Release ${{ steps.version.outputs.version }}
-          body: |
-            Automated release build for commit:
-            ${{ steps.commitmsg.outputs.message }}
-            Combined binaries are attached to this release.
-          files: collected/video_importer_all.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
