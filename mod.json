@@ -1,30 +1,23 @@
 {
-  "geode": "4.10.0",
   "id": "xx0wq.video.importer",
-  "name": "Video Importer (Object Video)",
-  "version": "1.0.0",
+  "name": "Video Importer",
+  "description": "Import MP4 videos into Geometry Dash with FPS and resolution controls. Generates realistic color triggers using HSV mapping for smooth playback.",
   "developer": "xx0wq",
-  "description": "Import MP4 in the editor, select FPS, auto-quantize (CIELAB) and play video using grouped color channels and a single sprite grid.",
-  "resources": {
-    "pixel": "resources/pixel.png"
-  },
-  "dependencies": [],
-  "entry": [],
-  "icon": "icon.png"
+  "version": "0.7.0",
+  "gameVersion": "2.2074",
+  "geodeVersion": "4.10.0",
   "platforms": {
+    "windows": "xx0wq.video.importer.win64.dll",
+    "macos": "xx0wq.video.importer.macos.dylib",
     "android64": "xx0wq.video.importer.android64.so",
     "android32": "xx0wq.video.importer.android32.so",
-    "windows": "xx0wq.video.importer.windows.dll",
-    "macos": "xx0wq.video.importer.macos.dylib",
     "ios": "xx0wq.video.importer.ios.dylib"
   },
-  "gd": {
-    "android": "2.2074",
-    "windows": "2.207",
-    "macos": "2.207",
-    "ios": "2.207"
+  "tags": ["editor", "video", "import", "color", "automation"],
+  "icon": "resources/icon.png",
+  "resources": {
+    "icon.png": "resources/icon.png",
+    "pixel.png": "resources/pixel.png"
   },
-  "mappings": {
-    "classes": []
-  }
+  "entry": "video_importer"
 }
