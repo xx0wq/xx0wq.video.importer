@@ -9,14 +9,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Prepare setup folder
         run: |
           mkdir -p setup/include
-          # Download SDK source for headers
-          curl -L https://github.com/geode-sdk/geode/archive/refs/tags/v4.10.0.zip -o geode-src.zip
-          unzip -q geode-src.zip -d setup
-          # Move headers into setup/include/Geode
-          cp -r setup/geode-4.10.0/include/Geode setup/include/
+          # Normalize lowercase 'geode' to uppercase 'Geode'
+          if [ -d "setup/geode/include/geode" ]; then
+            mkdir -p setup/include
+            mv setup/geode/include/geode setup/include/Geode
+          fi
+          # Ensure Geode.hpp exists
+          ls -R setup/include
+
       - uses: actions/upload-artifact@v4
         with:
           name: setup
