@@ -1,4 +1,4 @@
-name: Geode Mod Build & Release (No CMake)
+name: Geode Mod Build & Release (No CMake, Resilient Mobile)
 
 permissions:
   contents: write
@@ -8,6 +8,10 @@ on:
     branches:
       - main
   workflow_dispatch:
+
+env:
+  # Compiler feature flags shared across jobs
+  CXX_STD: c++20
 
 jobs:
   build-windows:
@@ -24,9 +28,9 @@ jobs:
           mkdir -p include/Geode
           cp -r geode-sdk/loader/include/Geode/* include/Geode/
           cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
-          test -f include/Geode/Enums.hpp || (echo "Enums.hpp missing" && exit 1)
-          test -f include/Geode/Bindings.hpp || (echo "Bindings.hpp missing" && exit 1)
-          test -f include/Geode/c++stl/string.hpp || (echo "string.hpp missing" && exit 1)
+          test -f include/Geode/Enums.hpp
+          test -f include/Geode/Bindings.hpp
+          test -f include/Geode/c++stl/string.hpp
 
       - name: Setup MSVC Dev Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
@@ -38,7 +42,8 @@ jobs:
           setlocal enabledelayedexpansion
           set SRC=
           for %%f in (src\*.cpp) do set SRC=!SRC! "%%f"
-          cl /EHsc /std:c++20 /DGEODE_PLATFORM_WINDOWS=1 /MD ^
+          rem Desktop: enable FFmpeg, keep GEODE_DLL as normal
+          cl /EHsc /std:%CXX_STD% /DGEODE_PLATFORM_WINDOWS=1 /MD ^
             /I include ^
             %SRC% ^
             /LD /link /OUT:build\xx0wq.video.importer.win64.dll
@@ -52,7 +57,6 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install FFmpeg (macOS)
         run: brew install ffmpeg
 
@@ -64,14 +68,14 @@ jobs:
           mkdir -p include/Geode
           cp -r geode-sdk/loader/include/Geode/* include/Geode/
           cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
-          test -f include/Geode/Enums.hpp || (echo "Enums.hpp missing" && exit 1)
-          test -f include/Geode/Bindings.hpp || (echo "Bindings.hpp missing" && exit 1)
-          test -f include/Geode/c++stl/string.hpp || (echo "string.hpp missing" && exit 1)
+          test -f include/Geode/Enums.hpp
+          test -f include/Geode/Bindings.hpp
+          test -f include/Geode/c++stl/string.hpp
 
       - name: Build macOS dylib
         run: |
           mkdir -p build
-          clang++ -std=c++20 -DGEODE_PLATFORM_MACOS=1 \
+          clang++ -std=${{ env.CXX_STD }} -DGEODE_PLATFORM_MACOS=1 \
             -I include \
             -dynamiclib src/*.cpp -o build/xx0wq.video.importer.macos.dylib
 
@@ -79,6 +83,40 @@ jobs:
         with:
           name: macos-binary
           path: build/xx0wq.video.importer.macos.dylib
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg dev libs (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg pkg-config libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
+
+      - name: Fetch Geode SDK headers + Enums.hpp
+        run: |
+          set -e
+          git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
+          git clone --depth=1 https://github.com/geode-sdk/bindings.git geode-bindings
+          mkdir -p include/Geode
+          cp -r geode-sdk/loader/include/Geode/* include/Geode/
+          cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
+          test -f include/Geode/Enums.hpp
+          test -f include/Geode/Bindings.hpp
+          test -f include/Geode/c++stl/string.hpp
+
+      - name: Build Linux .so
+        run: |
+          mkdir -p build
+          clang++ -std=${{ env.CXX_STD }} -DGEODE_PLATFORM_LINUX=1 \
+            -I include \
+            -fPIC -shared src/*.cpp \
+            -o build/xx0wq.video.importer.linux.so
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-binary
+          path: build/xx0wq.video.importer.linux.so
 
   build-android:
     runs-on: ubuntu-latest
@@ -96,19 +134,23 @@ jobs:
           mkdir -p include/Geode
           cp -r geode-sdk/loader/include/Geode/* include/Geode/
           cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
-          test -f include/Geode/Enums.hpp || (echo "Enums.hpp missing" && exit 1)
-          test -f include/Geode/Bindings.hpp || (echo "Bindings.hpp missing" && exit 1)
-          test -f include/Geode/c++stl/string.hpp || (echo "string.hpp missing" && exit 1)
+          test -f include/Geode/Enums.hpp
+          test -f include/Geode/Bindings.hpp
+          test -f include/Geode/c++stl/string.hpp
 
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26d
 
-      - name: Build Android ${{ matrix.abi }}
+      - name: Build Android ${{ matrix.abi }} (FFmpeg & Cocos disabled)
         run: |
           mkdir -p build
           $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ \
-            -std=c++20 -DGEODE_PLATFORM_ANDROID=1 \
+            -std=${{ env.CXX_STD }} \
+            -DGEODE_PLATFORM_ANDROID=1 \
+            -DGEODE_DLL= \
+            -DVIDEO_IMPORTER_NO_FFMPEG=1 \
+            -DVIDEO_IMPORTER_NO_COCOS=1 \
             -I include \
             -fPIC -shared src/*.cpp \
             -o build/xx0wq.video.importer.${{ matrix.abi == 'arm64-v8a' && 'android64' || 'android32' }}.so
@@ -131,14 +173,18 @@ jobs:
           mkdir -p include/Geode
           cp -r geode-sdk/loader/include/Geode/* include/Geode/
           cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
-          test -f include/Geode/Enums.hpp || (echo "Enums.hpp missing" && exit 1)
-          test -f include/Geode/Bindings.hpp || (echo "Bindings.hpp missing" && exit 1)
-          test -f include/Geode/c++stl/string.hpp || (echo "string.hpp missing" && exit 1)
+          test -f include/Geode/Enums.hpp
+          test -f include/Geode/Bindings.hpp
+          test -f include/Geode/c++stl/string.hpp
 
-      - name: Build iOS dylib
+      - name: Build iOS dylib (FFmpeg & Cocos disabled)
         run: |
           mkdir -p build
-          clang++ -std=c++20 -DGEODE_PLATFORM_IOS=1 \
+          clang++ -std=${{ env.CXX_STD }} \
+            -DGEODE_PLATFORM_IOS=1 \
+            -DGEODE_DLL= \
+            -DVIDEO_IMPORTER_NO_FFMPEG=1 \
+            -DVIDEO_IMPORTER_NO_COCOS=1 \
             -I include \
             -fPIC -shared src/*.cpp \
             -o build/xx0wq.video.importer.ios.dylib
@@ -148,67 +194,27 @@ jobs:
           name: ios-binary
           path: build/xx0wq.video.importer.ios.dylib
 
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install FFmpeg dev libs (Linux)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg pkg-config libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
-
-      - name: Fetch Geode SDK headers + Enums.hpp
-        run: |
-          set -e
-          git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
-          git clone --depth=1 https://github.com/geode-sdk/bindings.git geode-bindings
-          mkdir -p include/Geode
-          cp -r geode-sdk/loader/include/Geode/* include/Geode/
-          cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
-          test -f include/Geode/Enums.hpp || (echo "Enums.hpp missing" && exit 1)
-          test -f include/Geode/Bindings.hpp || (echo "Bindings.hpp missing" && exit 1)
-          test -f include/Geode/c++stl/string.hpp || (echo "string.hpp missing" && exit 1)
-
-      - name: Build Linux .so
-        run: |
-          mkdir -p build
-          clang++ -std=c++20 -DGEODE_PLATFORM_LINUX=1 \
-            -I include \
-            -fPIC -shared src/*.cpp \
-            -o build/xx0wq.video.importer.linux.so
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-binary
-          path: build/xx0wq.video.importer.linux.so
-
   package:
-    needs: [build-windows, build-macos, build-android, build-ios, build-linux]
+    needs: [build-windows, build-macos, build-linux, build-android, build-ios]
     runs-on: ubuntu-latest
     outputs:
       mod_version: ${{ steps.get_version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Create dist folder
         run: mkdir -p dist
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
-
       - name: Get version from mod.json
         id: get_version
         run: |
           VERSION=$(jq -r '.version' mod.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected mod version: $VERSION"
-
       - name: Create dist/final folder
         run: mkdir -p dist/final
-
       - name: Package binaries and resources
         run: |
           cp mod.json dist/
@@ -216,7 +222,6 @@ jobs:
           cd dist
           zip -r final/video_importer.zip mod.json resources xx0wq.video.importer.*.*
           cp final/video_importer.zip final/xx0wq.video.importer.geode
-
       - name: Generate checksums
         run: |
           cd dist/final
@@ -227,7 +232,6 @@ jobs:
           cat video_importer.zip.sha256 >> checksums.txt
           echo "\n**xx0wq.video_importer.geode**" >> checksums.txt
           cat xx0wq.video_importer.geode.sha256 >> checksums.txt
-
       - uses: actions/upload-artifact@v4
         with:
           name: video_importer-package
@@ -241,7 +245,6 @@ jobs:
         with:
           name: video_importer-package
           path: dist/final
-
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
