@@ -29,15 +29,19 @@ jobs:
           cp -r geode-sdk/loader/include/Geode/* include/Geode/
           cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
 
-      - name: Patch Geode headers to guard cocos includes
+      - name: Patch Geode headers to guard cocos/fmod includes
         run: |
           # Guard cocos-ext in addresser.hpp
-          sed -i 's|#include <cocos-ext.h>|#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)\n#include <cocos-ext.h>\n#endif|' include/Geode/utils/addresser.hpp
+          awk '
+            /#include <cocos-ext.h>/ {print "#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)"; print "#include <cocos-ext.h>"; print "#endif"; next}
+            {print}
+          ' include/Geode/utils/addresser.hpp > include/Geode/utils/addresser.hpp.tmp && mv include/Geode/utils/addresser.hpp.tmp include/Geode/utils/addresser.hpp
 
-          # Guard cocos-ext + cocos2d in Bindings.hpp
+          # Guard cocos-ext, cocos2d, fmod in Bindings.hpp
           awk '
             /#include <cocos-ext.h>/ {print "#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)"; print "#include <cocos-ext.h>"; next}
-            /#include <cocos2d.h>/   {print "#include <cocos2d.h>"; print "#endif"; next}
+            /#include <cocos2d.h>/   {print "#include <cocos2d.h>"; next}
+            /#include <fmod.hpp>/    {print "#include <fmod.hpp>"; print "#endif"; next}
             {print}
           ' include/Geode/Bindings.hpp > include/Geode/Bindings.hpp.tmp && mv include/Geode/Bindings.hpp.tmp include/Geode/Bindings.hpp
 
@@ -76,13 +80,17 @@ jobs:
           cp -r geode-sdk/loader/include/Geode/* include/Geode/
           cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
 
-      - name: Patch Geode headers to guard cocos includes
+      - name: Patch Geode headers to guard cocos/fmod includes
         run: |
-          sed -i '' 's|#include <cocos-ext.h>|#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)\n#include <cocos-ext.h>\n#endif|' include/Geode/utils/addresser.hpp
+          awk '
+            /#include <cocos-ext.h>/ {print "#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)"; print "#include <cocos-ext.h>"; print "#endif"; next}
+            {print}
+          ' include/Geode/utils/addresser.hpp > include/Geode/utils/addresser.hpp.tmp && mv include/Geode/utils/addresser.hpp.tmp include/Geode/utils/addresser.hpp
 
           awk '
             /#include <cocos-ext.h>/ {print "#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)"; print "#include <cocos-ext.h>"; next}
-            /#include <cocos2d.h>/   {print "#include <cocos2d.h>"; print "#endif"; next}
+            /#include <cocos2d.h>/   {print "#include <cocos2d.h>"; next}
+            /#include <fmod.hpp>/    {print "#include <fmod.hpp>"; print "#endif"; next}
             {print}
           ' include/Geode/Bindings.hpp > include/Geode/Bindings.hpp.tmp && mv include/Geode/Bindings.hpp.tmp include/Geode/Bindings.hpp
 
