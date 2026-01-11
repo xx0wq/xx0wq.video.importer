@@ -1,81 +1,93 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.16)
+project(xx0wq_video_importer VERSION 0.70.93 LANGUAGES CXX)
 
-project(xx0wq_video_importer
-    VERSION 0.70.0
-    LANGUAGES CXX
-)
-
+# Require C++17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# --- Sources ---
+# Path to Geode SDK headers (set by workflow)
+if(NOT DEFINED GEODE_SDK_DIR)
+    set(GEODE_SDK_DIR "${CMAKE_SOURCE_DIR}/setup")
+endif()
+
+include_directories("${GEODE_SDK_DIR}/include")
+
+# Platform detection
+if(WIN32)
+    add_definitions(-DGEODE_PLATFORM_WINDOWS=1)
+elseif(APPLE)
+    if(IOS)
+        add_definitions(-DGEODE_PLATFORM_IOS=1)
+    else()
+        add_definitions(-DGEODE_PLATFORM_MACOS=1)
+    endif()
+elseif(ANDROID)
+    add_definitions(-DGEODE_PLATFORM_ANDROID=1)
+else()
+    message(FATAL_ERROR "Unsupported platform for Geode mod")
+endif()
+
+# Source files
 set(SOURCES
     src/main.cpp
+    # add other .cpp files here
 )
 
-# --- Target ---
-add_library(xx0wq_video_importer SHARED ${SOURCES})
+# Build shared library (mod binary)
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
-# --- Geode SDK include path ---
-if(NOT DEFINED GEODE_SDK_DIR)
-    set(GEODE_SDK_DIR "${CMAKE_SOURCE_DIR}/external/geode")
-endif()
-
-set(GEODE_INCLUDE_DIR "${GEODE_SDK_DIR}/include")
-
-# Validate Geode headers early with a helpful error
-if(NOT EXISTS "${GEODE_INCLUDE_DIR}/Geode/Geode.hpp")
-    message(FATAL_ERROR
-        "Geode headers not found at: ${GEODE_INCLUDE_DIR}\n"
-        "Expected: ${GEODE_INCLUDE_DIR}/Geode/Geode.hpp\n"
-        "Tip: Ensure workflow clones geode to external/geode and passes -DGEODE_SDK_DIR"
-    )
-endif()
-
-target_include_directories(xx0wq_video_importer PRIVATE
-    "${GEODE_INCLUDE_DIR}"
-)
-
-# --- FFmpeg linking ---
+# Output name matches workflow expectations
 if(WIN32)
-    if(NOT DEFINED ENV{FFMPEG_DIR})
-        message(FATAL_ERROR "FFMPEG_DIR environment variable not set on Windows")
-    endif()
-
-    target_include_directories(xx0wq_video_importer PRIVATE
-        "$ENV{FFMPEG_DIR}/include"
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        OUTPUT_NAME "xx0wq.video.importer.win64"
     )
-    target_link_libraries(xx0wq_video_importer
-        "$ENV{FFMPEG_DIR}/lib/avcodec.lib"
-        "$ENV{FFMPEG_DIR}/lib/avformat.lib"
-        "$ENV{FFMPEG_DIR}/lib/avutil.lib"
-        "$ENV{FFMPEG_DIR}/lib/swscale.lib"
-    )
-else()
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
-        libavcodec
-        libavformat
-        libavutil
-        libswscale
-    )
-    target_link_libraries(xx0wq_video_importer PkgConfig::FFMPEG)
-endif()
-
-# --- Output names per platform ---
-if(WIN32)
-    set_target_properties(xx0wq_video_importer PROPERTIES OUTPUT_NAME "xx0wq.video.importer.win64")
 elseif(APPLE)
-    set_target_properties(xx0wq_video_importer PROPERTIES OUTPUT_NAME "xx0wq.video.importer.macos")
+    if(IOS)
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            OUTPUT_NAME "xx0wq.video.importer.ios"
+        )
+    else()
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            OUTPUT_NAME "xx0wq.video.importer.macos"
+        )
+    endif()
 elseif(ANDROID)
-    set_target_properties(xx0wq_video_importer PROPERTIES OUTPUT_NAME "xx0wq.video.importer.android${ANDROID_ABI}")
-else()
-    set_target_properties(xx0wq_video_importer PROPERTIES OUTPUT_NAME "xx0wq.video.importer.linux")
+    if(${ANDROID_ABI} STREQUAL "arm64-v8a")
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            OUTPUT_NAME "xx0wq.video.importer.android64"
+        )
+    else()
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            OUTPUT_NAME "xx0wq.video.importer.android32"
+        )
+    endif()
 endif()
 
-# --- Copy resources after build (optional) ---
-add_custom_command(TARGET xx0wq_video_importer POST_BUILD
+# Link FFmpeg (for video importer functionality)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+    libavcodec
+    libavformat
+    libavutil
+    libswscale
+)
+
+target_link_libraries(${PROJECT_NAME}
+    PkgConfig::FFMPEG
+)
+
+# Install step (optional, for packaging)
+install(TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION .
+    LIBRARY DESTINATION .
+)
+
+# Copy resources (mod.json, icons, etc.)
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/mod.json
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/mod.json
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/resources"
-        "$<TARGET_FILE_DIR:xx0wq_video_importer>/resources"
+        ${CMAKE_SOURCE_DIR}/resources
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/resources
 )
