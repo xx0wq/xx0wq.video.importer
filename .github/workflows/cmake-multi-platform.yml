@@ -14,6 +14,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Init submodules (if any)
+        run: git submodule update --init --recursive
+
+      - name: Download Geode SDK
+        run: |
+          mkdir -p external
+          git clone --depth=1 https://github.com/geode-sdk/geode-sdk.git external/geode
+          echo "GEODE_SDK_DIR=$GITHUB_WORKSPACE/external/geode" >> $GITHUB_ENV
+
       - name: Set up CMake
         uses: jwlawson/actions-setup-cmake@v1.13
 
@@ -26,7 +35,8 @@ jobs:
             libavformat-dev \
             libavutil-dev \
             libswscale-dev \
-            jq
+            jq \
+            zip
 
       - name: Configure
         run: cmake -B build -S .
