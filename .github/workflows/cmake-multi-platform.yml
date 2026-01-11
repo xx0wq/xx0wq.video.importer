@@ -1,7 +1,7 @@
-name: Geode Mod Build & Release
+name: Geode Mod Build & Release (No CMake)
 
 permissions:
-  contents: write   # allow GITHUB_TOKEN to create releases
+  contents: write
 
 on:
   push:
@@ -14,43 +14,49 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Fetch Geode SDK headers
         run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
           mkdir -p include
           cp -r geode-sdk/loader/include/Geode include/
-      - name: Build Windows
+
+      - name: Build Windows DLL
+        shell: bash
         run: |
-          mkdir build
-          cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DGEODE_SDK_DIR="$PWD/../include" -DGEODE_PLATFORM_WINDOWS=1
-          cmake --build . --config Release
-          cp Release/*.dll ../xx0wq.video.importer.win64.dll
+          mkdir -p build
+          cl /EHsc /std:c++20 /DGEODE_PLATFORM_WINDOWS=1 ^
+            /I include ^
+            src/*.cpp ^
+            /LD /Fe:build/xx0wq.video.importer.win64.dll
+
       - uses: actions/upload-artifact@v4
         with:
           name: win64-binary
-          path: xx0wq.video.importer.win64.dll
+          path: build/xx0wq.video.importer.win64.dll
 
   build-macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Fetch Geode SDK headers
         run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
           mkdir -p include
           cp -r geode-sdk/loader/include/Geode include/
-      - name: Build macOS
+
+      - name: Build macOS dylib
         run: |
-          mkdir build
-          cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DGEODE_SDK_DIR="$PWD/../include" -DGEODE_PLATFORM_MACOS=1
-          cmake --build . --config Release
-          cp *.dylib ../xx0wq.video.importer.macos.dylib
+          mkdir -p build
+          clang++ -std=c++20 -DGEODE_PLATFORM_MACOS=1 \
+            -I include \
+            -dynamiclib src/*.cpp -o build/xx0wq.video.importer.macos.dylib
+
       - uses: actions/upload-artifact@v4
         with:
           name: macos-binary
-          path: xx0wq.video.importer.macos.dylib
+          path: build/xx0wq.video.importer.macos.dylib
 
   build-android:
     runs-on: ubuntu-latest
@@ -59,59 +65,54 @@ jobs:
         abi: [arm64-v8a, armeabi-v7a]
     steps:
       - uses: actions/checkout@v4
+
       - name: Fetch Geode SDK headers
         run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
           mkdir -p include
           cp -r geode-sdk/loader/include/Geode include/
+
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26d
+
       - name: Build Android ${{ matrix.abi }}
         run: |
-          mkdir build
-          cd build
-          cmake .. \
-            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=${{ matrix.abi }} \
-            -DANDROID_PLATFORM=android-21 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DGEODE_SDK_DIR="$PWD/../include" \
-            -DGEODE_PLATFORM_ANDROID=1
-          cmake --build . --config Release
-          cp *.so ../xx0wq.video.importer.${{ matrix.abi == 'arm64-v8a' && 'android64' || 'android32' }}.so
+          mkdir -p build
+          $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ \
+            -std=c++20 -DGEODE_PLATFORM_ANDROID=1 \
+            -I include \
+            -fPIC -shared src/*.cpp \
+            -o build/xx0wq.video.importer.${{ matrix.abi == 'arm64-v8a' && 'android64' || 'android32' }}.so
+
       - uses: actions/upload-artifact@v4
         with:
           name: android-${{ matrix.abi }}-binary
-          path: xx0wq.video.importer.android*.so
+          path: build/xx0wq.video.importer.android*.so
 
   build-ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Fetch Geode SDK headers
         run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
           mkdir -p include
           cp -r geode-sdk/loader/include/Geode include/
-      - name: Fetch iOS toolchain
-        run: curl -L https://raw.githubusercontent.com/leetal/ios-cmake/master/ios.toolchain.cmake -o ios.toolchain.cmake
-      - name: Build iOS
+
+      - name: Build iOS dylib
         run: |
-          mkdir build
-          cd build
-          cmake .. \
-            -DCMAKE_TOOLCHAIN_FILE=$PWD/../ios.toolchain.cmake \
-            -DPLATFORM=OS64 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DGEODE_SDK_DIR="$PWD/../include" \
-            -DGEODE_PLATFORM_IOS=1
-          cmake --build . --config Release
-          cp *.dylib ../xx0wq.video.importer.ios.dylib
+          mkdir -p build
+          clang++ -std=c++20 -DGEODE_PLATFORM_IOS=1 \
+            -I include \
+            -fPIC -shared src/*.cpp \
+            -o build/xx0wq.video.importer.ios.dylib
+
       - uses: actions/upload-artifact@v4
         with:
           name: ios-binary
-          path: xx0wq.video.importer.ios.dylib
+          path: build/xx0wq.video.importer.ios.dylib
 
   package:
     needs: [build-windows, build-macos, build-android, build-ios]
@@ -120,28 +121,33 @@ jobs:
       mod_version: ${{ steps.get_version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Create dist folder
         run: mkdir -p dist
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
+
       - name: Get version from mod.json
         id: get_version
         run: |
           VERSION=$(jq -r '.version' mod.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected mod version: $VERSION"
+
       - name: Create dist/final folder
         run: mkdir -p dist/final
-      - name: Create packages
+
+      - name: Package binaries and resources
         run: |
           cp mod.json dist/
           cp -r resources dist/
-          cp -r .github/workflows dist/workflows/
           cd dist
-          zip -r final/video_importer.zip mod.json resources workflows xx0wq.video.importer.*.*
+          zip -r final/video_importer.zip mod.json resources xx0wq.video.importer.*.*
           cp final/video_importer.zip final/xx0wq.video.importer.geode
+
       - name: Generate checksums
         run: |
           cd dist/final
@@ -152,6 +158,7 @@ jobs:
           cat video_importer.zip.sha256 >> checksums.txt
           echo "\n**xx0wq.video.importer.geode**" >> checksums.txt
           cat xx0wq.video.importer.geode.sha256 >> checksums.txt
+
       - uses: actions/upload-artifact@v4
         with:
           name: video_importer-package
@@ -165,6 +172,7 @@ jobs:
         with:
           name: video_importer-package
           path: dist/final
+
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
