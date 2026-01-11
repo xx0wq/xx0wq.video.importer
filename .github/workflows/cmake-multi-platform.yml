@@ -9,20 +9,31 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download Geode SDK
+
+      - name: Download Geode SDK + export path
         run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git external/geode
           "GEODE_SDK_DIR=$PWD/external/geode" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - name: Download FFmpeg dev build (Windows)
+          # Preflight: validate header exists
+          if (-not (Test-Path "$PWD/external/geode/include/Geode/Geode.hpp")) {
+            Get-ChildItem -Recurse external/geode | Select-Object FullName | Out-String | Write-Host
+            throw "Geode.hpp not found under external/geode/include/Geode/"
+          }
+
+      - name: Download FFmpeg dev build (Windows) + export path
         run: |
           curl -L https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z -o ffmpeg.7z
           7z x ffmpeg.7z -oC:/ffmpeg
           $dir = Get-ChildItem -Directory C:/ffmpeg | Select-Object -First 1
+          if (-not $dir) { throw "FFMPEG_DIR folder not found after extraction." }
           "FFMPEG_DIR=$($dir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Configure
         run: cmake -B build -S . -DGEODE_SDK_DIR=$env:GEODE_SDK_DIR
+
       - name: Build
         run: cmake --build build --config Release
+
       - uses: actions/upload-artifact@v4
         with:
           name: win64-binary
@@ -32,12 +43,23 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
+
+      - name: Download Geode SDK + export path
+        run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git external/geode
           echo "GEODE_SDK_DIR=$PWD/external/geode" >> $GITHUB_ENV
-      - run: brew install ffmpeg pkg-config
-      - run: cmake -B build -S . -DGEODE_SDK_DIR=$GEODE_SDK_DIR
-      - run: cmake --build build --config Release
+          # Preflight
+          [ -f "$PWD/external/geode/include/Geode/Geode.hpp" ] || { find external/geode -maxdepth 3 -type f | sed -n '1,200p'; exit 1; }
+
+      - name: Install FFmpeg
+        run: brew install ffmpeg pkg-config
+
+      - name: Configure
+        run: cmake -B build -S . -DGEODE_SDK_DIR=$GEODE_SDK_DIR
+
+      - name: Build
+        run: cmake --build build --config Release
+
       - uses: actions/upload-artifact@v4
         with:
           name: macos-binary
@@ -47,12 +69,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
+
+      - name: Download Geode SDK + export path
+        run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git external/geode
           echo "GEODE_SDK_DIR=$PWD/external/geode" >> $GITHUB_ENV
-      - run: sudo apt-get update && sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
-      - run: cmake -B build -S . -DANDROID_ABI=armeabi-v7a -DGEODE_SDK_DIR=$GEODE_SDK_DIR
-      - run: cmake --build build --config Release
+          # Preflight
+          [ -f "$PWD/external/geode/include/Geode/Geode.hpp" ] || { find external/geode -maxdepth 3 -type f | sed -n '1,200p'; exit 1; }
+
+      - name: Install FFmpeg dev libs
+        run: sudo apt-get update && sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
+
+      - name: Configure
+        run: cmake -B build -S . -DANDROID_ABI=armeabi-v7a -DGEODE_SDK_DIR=$GEODE_SDK_DIR
+
+      - name: Build
+        run: cmake --build build --config Release
+
       - uses: actions/upload-artifact@v4
         with:
           name: android32-binary
@@ -62,12 +95,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
+
+      - name: Download Geode SDK + export path
+        run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git external/geode
           echo "GEODE_SDK_DIR=$PWD/external/geode" >> $GITHUB_ENV
-      - run: sudo apt-get update && sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
-      - run: cmake -B build -S . -DANDROID_ABI=arm64-v8a -DGEODE_SDK_DIR=$GEODE_SDK_DIR
-      - run: cmake --build build --config Release
+          # Preflight
+          [ -f "$PWD/external/geode/include/Geode/Geode.hpp" ] || { find external/geode -maxdepth 3 -type f | sed -n '1,200p'; exit 1; }
+
+      - name: Install FFmpeg dev libs
+        run: sudo apt-get update && sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev libswscale-dev pkg-config
+
+      - name: Configure
+        run: cmake -B build -S . -DANDROID_ABI=arm64-v8a -DGEODE_SDK_DIR=$GEODE_SDK_DIR
+
+      - name: Build
+        run: cmake --build build --config Release
+
       - uses: actions/upload-artifact@v4
         with:
           name: android64-binary
@@ -77,12 +121,23 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
+
+      - name: Download Geode SDK + export path
+        run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git external/geode
           echo "GEODE_SDK_DIR=$PWD/external/geode" >> $GITHUB_ENV
-      - run: brew install ffmpeg pkg-config
-      - run: cmake -B build -S . -DGEODE_SDK_DIR=$GEODE_SDK_DIR
-      - run: cmake --build build --config Release
+          # Preflight
+          [ -f "$PWD/external/geode/include/Geode/Geode.hpp" ] || { find external/geode -maxdepth 3 -type f | sed -n '1,200p'; exit 1; }
+
+      - name: Install FFmpeg
+        run: brew install ffmpeg pkg-config
+
+      - name: Configure
+        run: cmake -B build -S . -DGEODE_SDK_DIR=$GEODE_SDK_DIR
+
+      - name: Build
+        run: cmake --build build --config Release
+
       - uses: actions/upload-artifact@v4
         with:
           name: ios-binary
@@ -108,11 +163,13 @@ jobs:
     needs: [package-all]
     steps:
       - uses: actions/checkout@v4
+
       - name: Check commit message
         id: commitmsg
         run: |
           COMMIT_MSG="$(git log -1 --pretty=%B)"
           echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+
       - name: Extract release version
         id: version
         if: contains(steps.commitmsg.outputs.message, 'release')
@@ -120,11 +177,13 @@ jobs:
           VERSION=$(echo "${{ steps.commitmsg.outputs.message }}" | sed -n 's/.*release \([0-9]\+\).*/\1/p')
           FULL_VERSION="0.70.${VERSION}"
           echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
+
       - name: Update mod.json version
         if: contains(steps.commitmsg.outputs.message, 'release')
         run: |
           jq ".version = \"${{ steps.version.outputs.version }}\"" mod.json > mod.json.tmp
           mv mod.json.tmp mod.json
+
       - name: Commit updated mod.json
         if: contains(steps.commitmsg.outputs.message, 'release')
         run: |
@@ -133,6 +192,7 @@ jobs:
           git add mod.json
           git commit -m "chore: bump mod.json version to ${{ steps.version.outputs.version }}"
           git push
+
       - name: Create Release
         if: contains(steps.commitmsg.outputs.message, 'release')
         uses: softprops/action-gh-release@v1
@@ -142,8 +202,7 @@ jobs:
           body: |
             Automated release build for commit:
             ${{ steps.commitmsg.outputs.message }}
-            Download combined binaries here:
-            https://github.com/${{ github.repository }}/actions/artifacts/${{ github.run_id }}
+            Combined binaries are attached to this release.
           files: collected/video_importer_all.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
