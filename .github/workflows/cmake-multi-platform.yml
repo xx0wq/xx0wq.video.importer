@@ -1,9 +1,12 @@
 name: Geode Mod Build & Release
 
+permissions:
+  contents: write   # ✅ allow GITHUB_TOKEN to create releases
+
 on:
-  push:        # runs on every push
+  push:
     branches:
-      - main   # adjust if your default branch is different
+      - main        # adjust if your default branch is different
   workflow_dispatch:
 
 jobs:
