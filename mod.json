@@ -1,11 +1,15 @@
 {
+  "geode": "v4.10.0",
+  "gd": {
+    "win": "2.2074",
+    "mac": "2.2074",
+    "android": "2.2074",
+    "ios": "2.2074"
+  },
   "id": "xx0wq.video.importer",
   "name": "Video Importer",
-  "description": "Import MP4 videos into Geometry Dash with FPS and resolution controls. Generates realistic color triggers using HSV mapping for smooth playback.",
+  "version": "0.70.1",
   "developer": "xx0wq",
-  "version": "0.7.0",
-  "gd": "2.2074",
-  "geode": "4.10.0",
   "platforms": {
     "windows": "xx0wq.video.importer.win64.dll",
     "macos": "xx0wq.video.importer.macos.dylib",
@@ -13,11 +17,9 @@
     "android32": "xx0wq.video.importer.android32.so",
     "ios": "xx0wq.video.importer.ios.dylib"
   },
-  "tags": ["editor", "video", "import", "color", "automation"],
-  "icon": "resources/icon.png",
   "resources": {
     "icon.png": "resources/icon.png",
-    "pixel.png": "resources/pixel.png"
+    "about.md": "resources/about.md"
   },
   "entry": "video_importer"
 }

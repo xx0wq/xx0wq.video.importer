@@ -1,40 +1,37 @@
-cmake_minimum_required(VERSION 3.16)   # safe baseline for Android/iOS builds
-project(video_importer LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.18)
+project(video_importer)
 
-# Set C++ standard
+# Use modern C++
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Collect all source files in src/
-file(GLOB SOURCES src/*.cpp)
-
-# Define the shared library
-add_library(video_importer SHARED ${SOURCES})
-
-# Include headers
-target_include_directories(video_importer PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
+# Define source files
+set(SOURCES
+    src/main.cpp
 )
 
-# Platform-specific settings
-if(WIN32)
-    message(STATUS "Configuring for Windows")
-    # Add Windows-specific libraries if needed
-    target_compile_definitions(video_importer PRIVATE PLATFORM_WINDOWS)
-elseif(APPLE)
-    message(STATUS "Configuring for macOS/iOS")
-    target_compile_definitions(video_importer PRIVATE PLATFORM_APPLE)
-elseif(ANDROID)
-    message(STATUS "Configuring for Android")
-    target_compile_definitions(video_importer PRIVATE PLATFORM_ANDROID)
-else()
-    message(STATUS "Configuring for other platform")
-endif()
+# Create shared library (Geode mod binary)
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
-# Optional: warnings and stricter build flags
-if(MSVC)
-    target_compile_options(video_importer PRIVATE /W4 /permissive-)
-else()
-    target_compile_options(video_importer PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+# Include Geode SDK headers
+# Make sure GEODE_SDK_DIR points to your Geode SDK path
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${GEODE_SDK_DIR}/include
+)
+
+# Link against Geode
+target_link_libraries(${PROJECT_NAME} geode)
+
+# --- Platform specific settings ---
+if(WIN32)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        OUTPUT_NAME "xx0wq.video.importer.win64"
+    )
+elseif(APPLE)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        OUTPUT_NAME "xx0wq.video.importer.macos"
+    )
+elseif(ANDROID)
+    # Build both 32 and 64 bit if needed
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        OUTPUT_NAME
