@@ -18,7 +18,8 @@ jobs:
       - name: Set version in mod.json
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          echo "Detected version: $VERSION"
+          if [[ "$VERSION" == "$GITHUB_REF_NAME" ]]; then VERSION="0.7.0"; fi
+          echo "Using version: $VERSION"
           jq --arg ver "$VERSION" '.version = $ver' mod.json > mod.json.tmp && mv mod.json.tmp mod.json
 
       - name: Build ${{ matrix.platform }}
