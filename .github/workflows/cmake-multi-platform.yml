@@ -1,7 +1,7 @@
 name: Geode Mod Build & Release
 
 permissions:
-  contents: write   # ✅ allow GITHUB_TOKEN to create releases
+  contents: write   # allow GITHUB_TOKEN to create releases
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DGEODE_PLATFORM_WINDOWS=1
           cmake --build . --config Release
           cp Release/*.dll ../xx0wq.video.importer.win64.dll
       - uses: actions/upload-artifact@v4
@@ -34,7 +34,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DGEODE_PLATFORM_MACOS=1
           cmake --build . --config Release
           cp *.dylib ../xx0wq.video.importer.macos.dylib
       - uses: actions/upload-artifact@v4
@@ -60,7 +60,8 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=${{ matrix.abi }} \
             -DANDROID_PLATFORM=android-21 \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGEODE_PLATFORM_ANDROID=1
           cmake --build . --config Release
           cp *.so ../xx0wq.video.importer.${{ matrix.abi == 'arm64-v8a' && 'android64' || 'android32' }}.so
       - uses: actions/upload-artifact@v4
@@ -81,7 +82,8 @@ jobs:
           cmake .. \
             -DCMAKE_TOOLCHAIN_FILE=$PWD/../ios.toolchain.cmake \
             -DPLATFORM=OS64 \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGEODE_PLATFORM_IOS=1
           cmake --build . --config Release
           cp *.dylib ../xx0wq.video.importer.ios.dylib
       - uses: actions/upload-artifact@v4
@@ -109,12 +111,15 @@ jobs:
         run: |
           VERSION=$(jq -r '.version' mod.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected mod version: $VERSION"
+
       - name: Validate binaries
         run: |
           echo "Checking for expected binaries..."
           ls dist || echo "dist folder missing"
           ls dist/* || echo "No binaries found"
           ls dist/xx0wq.video.importer.* || echo "Some binaries may be missing"
+
       - name: Create dist/final folder
         run: mkdir -p dist/final
 
@@ -126,6 +131,7 @@ jobs:
           cd dist
           zip -r final/video_importer.zip mod.json resources workflows xx0wq.video.importer.*.*
           cp final/video_importer.zip final/xx0wq.video.importer.geode
+
       - name: Generate checksums
         run: |
           cd dist/final
@@ -135,7 +141,7 @@ jobs:
           echo "\n**video_importer.zip**" >> checksums.txt
           cat video_importer.zip.sha256 >> checksums.txt
           echo "\n**xx0wq.video.importer.geode**" >> checksums.txt
-          cat xx0wq.video.importer.geode.sha256 >> checksums.txt
+          cat xx0wq.video_importer.geode.sha256 >> checksums.txt
       - uses: actions/upload-artifact@v4
         with:
           name: video_importer-package
