@@ -95,13 +95,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Create dist folder
+        run: mkdir -p dist
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
 
+      - name: Validate binaries
+        run: |
+          ls dist
+          test -f dist/xx0wq.video.importer.win64.dll
+          test -f dist/xx0wq.video.importer.macos.dylib
+          test -f dist/xx0wq.video.importer.android64.so
+          test -f dist/xx0wq.video.importer.android32.so
+          test -f dist/xx0wq.video.importer.ios.dylib
+
+      - name: Create dist/final folder
+        run: mkdir -p dist/final
+
       - name: Create packages
         run: |
-          mkdir dist/final
           cp mod.json dist/
           cp -r resources dist/
           cd dist
@@ -117,7 +131,7 @@ jobs:
           echo "\n**video_importer.zip**" >> checksums.txt
           cat video_importer.zip.sha256 >> checksums.txt
           echo "\n**xx0wq.video.importer.geode**" >> checksums.txt
-          cat xx0wq.video_importer.geode.sha256 >> checksums.txt
+          cat xx0wq.video.importer.geode.sha256 >> checksums.txt
 
       - uses: actions/upload-artifact@v4
         with:
