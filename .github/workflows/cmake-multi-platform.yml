@@ -18,9 +18,9 @@ jobs:
 
       - name: Download FFmpeg dev build (Windows)
         run: |
-          curl -L https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-6.1-full_build-shared.7z -o ffmpeg.7z
+          curl -L https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z -o ffmpeg.7z
           7z x ffmpeg.7z -oC:/ffmpeg
-          echo "FFMPEG_DIR=C:/ffmpeg/ffmpeg-6.1-full_build-shared" >> $GITHUB_ENV
+          echo "FFMPEG_DIR=C:/ffmpeg/ffmpeg-release-full" >> $GITHUB_ENV
 
       - name: Configure
         run: cmake -B build -S . -DGEODE_SDK_DIR=external/geode
@@ -135,11 +135,13 @@ jobs:
     needs: [package-all]
     steps:
       - uses: actions/checkout@v4
+
       - name: Check commit message
         id: commitmsg
         run: |
           COMMIT_MSG="$(git log -1 --pretty=%B)"
           echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+
       - name: Extract release version
         id: version
         if: contains(steps.commitmsg.outputs.message, 'release')
@@ -147,6 +149,23 @@ jobs:
           VERSION=$(echo "${{ steps.commitmsg.outputs.message }}" | sed -n 's/.*release \([0-9]\+\).*/\1/p')
           FULL_VERSION="0.70.${VERSION}"
           echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update mod.json version
+        if: contains(steps.commitmsg.outputs.message, 'release')
+        run: |
+          jq ".version = \"${{ steps.version.outputs.version }}\"" mod.json > mod.json.tmp
+          mv mod.json.tmp mod.json
+          echo "Updated mod.json version to ${{ steps.version.outputs.version }}"
+
+      - name: Commit updated mod.json
+        if: contains(steps.commitmsg.outputs.message, 'release')
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod.json
+          git commit -m "chore: bump mod.json version to ${{ steps.version.outputs.version }}"
+          git push
+
       - name: Create Release
         if: contains(steps.commitmsg.outputs.message, 'release')
         uses: softprops/action-gh-release@v1
