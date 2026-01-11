@@ -1,38 +1,49 @@
-- name: Fetch Geode SDK headers (online first, local fallback for Enums)
-  run: |
-    set -e
-    SDK_SRC="loader/include/Geode"
+name: Build Android64
 
-    echo "Attempting to download Geode SDK headers..."
-    if git clone --depth=1 https://github.com/geode-sdk/geode.git tmp_geode; then
-      if [ -d "tmp_geode/${SDK_SRC}" ]; then
-        rm -rf setup/include/Geode
-        cp -r "tmp_geode/${SDK_SRC}" setup/include/
-        echo "Downloaded headers copied to setup/include/Geode"
-      else
-        echo "Online repo missing ${SDK_SRC}, falling back to local repo headers."
-      fi
-      rm -rf tmp_geode
-    else
-      echo "Download failed. Falling back to local repo headers."
-    fi
+on:
+  push:
+    branches: [ main ]
 
-    # If Enums.hpp is missing after download, copy from your repo
-    if [ ! -f "setup/include/Geode/Enums.hpp" ] && [ -f ".github/backup/Enums.hpp" ]; then
-      echo "Enums.hpp missing from online SDK, copying from repo backup..."
-      cp ".github/backup/Enums.hpp" setup/include/Geode/Enums.hpp
-    elif [ ! -f "setup/include/Geode/Enums.hpp" ] && [ -f "setup/include/Geode/enums.hpp" ]; then
-      echo "Using lowercase enums.hpp as fallback."
-      cp "setup/include/Geode/enums.hpp" setup/include/Geode/Enums.hpp
-    fi
+permissions:
+  contents: write
 
-    # Verify critical files
-    for f in "Enums.hpp" "platform/cplatform.h" "c++stl/gdstdlib.hpp"; do
-      if [ ! -f "setup/include/Geode/$f" ]; then
-        echo "Missing critical header: $f"
-        exit 1
-      fi
-    done
+jobs:
+  build-android64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    echo "Header check passed."
-    ls -1 setup/include/Geode | head -n 20
+      - name: Prepare include folder
+        run: mkdir -p setup/include
+
+      - name: Fetch Geode SDK headers (online first, fallback to repo)
+        run: |
+          set -e
+          if git clone --depth=1 https://github.com/geode-sdk/geode.git tmp_geode; then
+            cp -r tmp_geode/loader/include/Geode setup/include/
+            rm -rf tmp_geode
+          else
+            echo "Download failed, using repo headers."
+          fi
+          # Fallback: copy Enums.hpp from repo if missing
+          if [ ! -f "setup/include/Geode/Enums.hpp" ] && [ -f "setup/include/Geode/enums.hpp" ]; then
+            cp setup/include/Geode/enums.hpp setup/include/Geode/Enums.hpp
+          fi
+
+      - name: Install FFmpeg dev libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg pkg-config libavcodec-dev:amd64 libavformat-dev:amd64 libavutil-dev:amd64 libswscale-dev:amd64
+
+      - name: Configure CMake
+        run: cmake -B build -S . -DGEODE_SDK_DIR="$PWD/setup" -DGEODE_PLATFORM_ANDROID=1
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android64-binary
+          path: build/*.so
