@@ -99,7 +99,7 @@ jobs:
         with:
           path: dist
 
-      - name: Validate binaries (optional)
+      - name: Validate binaries
         run: |
           echo "Checking for expected binaries..."
           ls dist || echo "dist folder missing"
@@ -113,8 +113,9 @@ jobs:
         run: |
           cp mod.json dist/
           cp -r resources dist/
+          cp -r .github/workflows dist/workflows/
           cd dist
-          zip -r final/video_importer.zip mod.json resources xx0wq.video.importer.*.*
+          zip -r final/video_importer.zip mod.json resources workflows xx0wq.video.importer.*.*
           cp final/video_importer.zip final/xx0wq.video.importer.geode
 
       - name: Generate checksums
