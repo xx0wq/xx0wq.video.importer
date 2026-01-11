@@ -13,87 +13,6 @@ env:
   CXX_STD: c++20
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Fetch Geode SDK headers + Enums.hpp
-        shell: bash
-        run: |
-          git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
-          git clone --depth=1 https://github.com/geode-sdk/bindings.git geode-bindings
-          mkdir -p include/Geode
-          cp -r geode-sdk/loader/include/Geode/* include/Geode/
-          cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
-      - name: Setup MSVC Dev Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1
-      - name: Build Windows DLL
-        shell: cmd
-        run: |
-          if not exist build mkdir build
-          setlocal enabledelayedexpansion
-          set SRC=
-          for %%f in (src\*.cpp) do set SRC=!SRC! "%%f"
-          cl /EHsc /std:%CXX_STD% /DGEODE_PLATFORM_WINDOWS=1 /MD ^
-            /I include ^
-            %SRC% ^
-            /LD /link /OUT:build\xx0wq.video.importer.win64.dll
-      - uses: actions/upload-artifact@v4
-        with:
-          name: win64-binary
-          path: build/xx0wq.video.importer.win64.dll
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install FFmpeg (macOS)
-        run: brew install ffmpeg
-      - name: Fetch Geode SDK headers + Enums.hpp
-        run: |
-          git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
-          git clone --depth=1 https://github.com/geode-sdk/bindings.git geode-bindings
-          mkdir -p include/Geode
-          cp -r geode-sdk/loader/include/Geode/* include/Geode/
-          cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
-      - name: Build macOS dylib
-        run: |
-          mkdir -p build
-          clang++ -std=${{ env.CXX_STD }} -DGEODE_PLATFORM_MACOS=1 \
-            -I include \
-            -dynamiclib src/*.cpp -o build/xx0wq.video.importer.macos.dylib
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-binary
-          path: build/xx0wq.video.importer.macos.dylib
-
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install FFmpeg dev libs (Linux)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg pkg-config libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
-      - name: Fetch Geode SDK headers + Enums.hpp
-        run: |
-          git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
-          git clone --depth=1 https://github.com/geode-sdk/bindings.git geode-bindings
-          mkdir -p include/Geode
-          cp -r geode-sdk/loader/include/Geode/* include/Geode/
-          cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
-      - name: Build Linux .so
-        run: |
-          mkdir -p build
-          clang++ -std=${{ env.CXX_STD }} -DGEODE_PLATFORM_LINUX=1 \
-            -I include \
-            -fPIC -shared src/*.cpp \
-            -o build/xx0wq.video.importer.linux.so
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-binary
-          path: build/xx0wq.video.importer.linux.so
-
   build-android:
     runs-on: ubuntu-latest
     strategy:
@@ -101,6 +20,7 @@ jobs:
         abi: [arm64-v8a, armeabi-v7a]
     steps:
       - uses: actions/checkout@v4
+
       - name: Fetch Geode SDK headers + Enums.hpp
         run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
@@ -108,13 +28,23 @@ jobs:
           mkdir -p include/Geode
           cp -r geode-sdk/loader/include/Geode/* include/Geode/
           cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
-      - name: Patch Geode headers to guard cocos-ext
+
+      - name: Patch Geode headers to guard cocos includes
         run: |
+          # Guard cocos-ext in addresser.hpp
           sed -i 's|#include <cocos-ext.h>|#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)\n#include <cocos-ext.h>\n#endif|' include/Geode/utils/addresser.hpp
-          sed -i 's|#include <cocos-ext.h>|#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)\n#include <cocos-ext.h>\n#endif|' include/Geode/Bindings.hpp
+
+          # Guard cocos-ext + cocos2d in Bindings.hpp
+          awk '
+            /#include <cocos-ext.h>/ {print "#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)"; print "#include <cocos-ext.h>"; next}
+            /#include <cocos2d.h>/   {print "#include <cocos2d.h>"; print "#endif"; next}
+            {print}
+          ' include/Geode/Bindings.hpp > include/Geode/Bindings.hpp.tmp && mv include/Geode/Bindings.hpp.tmp include/Geode/Bindings.hpp
+
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26d
+
       - name: Build Android ${{ matrix.abi }}
         run: |
           mkdir -p build
@@ -127,6 +57,7 @@ jobs:
             -I include \
             -fPIC -shared src/*.cpp \
             -o build/xx0wq.video.importer.${{ matrix.abi == 'arm64-v8a' && 'android64' || 'android32' }}.so
+
       - uses: actions/upload-artifact@v4
         with:
           name: android-${{ matrix.abi }}-binary
@@ -136,6 +67,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Fetch Geode SDK headers + Enums.hpp
         run: |
           git clone --depth=1 https://github.com/geode-sdk/geode.git geode-sdk
@@ -143,10 +75,17 @@ jobs:
           mkdir -p include/Geode
           cp -r geode-sdk/loader/include/Geode/* include/Geode/
           cp geode-bindings/bindings/include/Geode/Enums.hpp include/Geode/
-      - name: Patch Geode headers to guard cocos-ext
+
+      - name: Patch Geode headers to guard cocos includes
         run: |
           sed -i '' 's|#include <cocos-ext.h>|#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)\n#include <cocos-ext.h>\n#endif|' include/Geode/utils/addresser.hpp
-          sed -i '' 's|#include <cocos-ext.h>|#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)\n#include <cocos-ext.h>\n#endif|' include/Geode/Bindings.hpp
+
+          awk '
+            /#include <cocos-ext.h>/ {print "#if !defined(GEODE_PLATFORM_ANDROID) && !defined(GEODE_PLATFORM_IOS)"; print "#include <cocos-ext.h>"; next}
+            /#include <cocos2d.h>/   {print "#include <cocos2d.h>"; print "#endif"; next}
+            {print}
+          ' include/Geode/Bindings.hpp > include/Geode/Bindings.hpp.tmp && mv include/Geode/Bindings.hpp.tmp include/Geode/Bindings.hpp
+
       - name: Build iOS dylib
         run: |
           mkdir -p build
@@ -158,9 +97,8 @@ jobs:
             -I include \
             -fPIC -shared src/*.cpp \
             -o build/xx0wq.video.importer.ios.dylib
+
       - uses: actions/upload-artifact@v4
         with:
           name: ios-binary
           path: build/xx0wq.video.importer.ios.dylib
-
-  # package + release jobs unchanged...
