@@ -7,71 +7,96 @@ on:
       - 'v*'   # e.g. v0.7.0, v0.7.1
 
 jobs:
-  build:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure & Build Windows
+        run: |
+          mkdir build-win64
+          cd build-win64
+          cmake .. -G "Visual Studio 17 2022" -A x64
+          cmake --build . --config Release
+      - name: Copy binary
+        run: copy build-win64\\Release\\*.dll .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win64-binary
+          path: xx0wq.video.importer.win64.dll
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure & Build macOS
+        run: |
+          mkdir build-macos
+          cd build-macos
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+      - name: Copy binary
+        run: cp build-macos/*.dylib .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-binary
+          path: xx0wq.video.importer.macos.dylib
+
+  build-android:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: [windows, macos, android64, android32, ios]
+        abi: [arm64-v8a, armeabi-v7a]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Build ${{ matrix.platform }}
+      - uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+      - name: Configure & Build Android (${{ matrix.abi }})
         run: |
-          mkdir build
-          cd build
-          case "${{ matrix.platform }}" in
-            windows)
-              cmake .. -A x64
-              cmake --build . --config Release
-              cp Release/*.dll ../xx0wq.video.importer.win64.dll
-              ;;
-            macos)
-              cmake .. -DCMAKE_BUILD_TYPE=Release
-              cmake --build . --config Release
-              cp *.dylib ../xx0wq.video.importer.macos.dylib
-              ;;
-            android64)
-              cmake .. \
-                -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
-                -DANDROID_ABI=arm64-v8a \
-                -DANDROID_PLATFORM=android-21 \
-                -DCMAKE_BUILD_TYPE=Release
-              cmake --build . --config Release
-              cp *.so ../xx0wq.video.importer.android64.so
-              ;;
-            android32)
-              cmake .. \
-                -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
-                -DANDROID_ABI=armeabi-v7a \
-                -DANDROID_PLATFORM=android-21 \
-                -DCMAKE_BUILD_TYPE=Release
-              cmake --build . --config Release
-              cp *.so ../xx0wq.video.importer.android32.so
-              ;;
-            ios)
-              curl -L https://raw.githubusercontent.com/leetal/ios-cmake/master/ios.toolchain.cmake -o ios.toolchain.cmake
-              cmake .. \
-                -DCMAKE_TOOLCHAIN_FILE=../ios.toolchain.cmake \
-                -DPLATFORM=OS64 \
-                -DCMAKE_BUILD_TYPE=Release
-              cmake --build . --config Release
-              cp *.dylib ../xx0wq.video.importer.ios.dylib
-              ;;
-          esac
-
+          mkdir build-${{ matrix.abi }}
+          cd build-${{ matrix.abi }}
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=${{ matrix.abi }} \
+            -DANDROID_PLATFORM=android-21 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+      - name: Copy binary
+        run: cp build-${{ matrix.abi }}/*.so .
       - uses: actions/upload-artifact@v4
         with:
-          name: binaries
-          path: xx0wq.video.importer.*
+          name: android-${{ matrix.abi }}-binary
+          path: xx0wq.video.importer.android*.so
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch iOS toolchain
+        run: curl -L https://raw.githubusercontent.com/leetal/ios-cmake/master/ios.toolchain.cmake -o ios.toolchain.cmake
+      - name: Configure & Build iOS
+        run: |
+          mkdir build-ios
+          cd build-ios
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE=$PWD/../ios.toolchain.cmake \
+            -DPLATFORM=OS64 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+      - name: Copy binary
+        run: cp build-ios/*.dylib .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-binary
+          path: xx0wq.video.importer.ios.dylib
 
   package:
-    needs: build
+    needs: [build-windows, build-macos, build-android, build-ios]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: binaries
           path: dist
 
       - name: Create packages
