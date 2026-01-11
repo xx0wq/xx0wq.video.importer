@@ -1,167 +1,95 @@
-name: Geode Mod Build & Release
-
-permissions:
-  contents: write   # ✅ allow GITHUB_TOKEN to create releases
+name: Build and Release Video Importer
 
 on:
   push:
     branches:
-      - main        # adjust if your default branch is different
-  workflow_dispatch:
+      - main
+      - master
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build Windows
-        run: |
-          mkdir build
-          cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64
-          cmake --build . --config Release
-          cp Release/*.dll ../xx0wq.video.importer.win64.dll
-      - uses: actions/upload-artifact@v4
-        with:
-          name: win64-binary
-          path: xx0wq.video.importer.win64.dll
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build macOS
-        run: |
-          mkdir build
-          cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
-          cmake --build . --config Release
-          cp *.dylib ../xx0wq.video.importer.macos.dylib
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-binary
-          path: xx0wq.video.importer.macos.dylib
-
-  build-android:
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        abi: [arm64-v8a, armeabi-v7a]
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r26d
-      - name: Build Android ${{ matrix.abi }}
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up CMake
+        uses: jwlawson/actions-setup-cmake@v1.13
+
+      - name: Install dependencies
         run: |
-          mkdir build
-          cd build
-          cmake .. \
-            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=${{ matrix.abi }} \
-            -DANDROID_PLATFORM=android-21 \
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build . --config Release
-          cp *.so ../xx0wq.video.importer.${{ matrix.abi == 'arm64-v8a' && 'android64' || 'android32' }}.so
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-${{ matrix.abi }}-binary
-          path: xx0wq.video.importer.android*.so
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            jq
 
-  build-ios:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Fetch iOS toolchain
-        run: curl -L https://raw.githubusercontent.com/leetal/ios-cmake/master/ios.toolchain.cmake -o ios.toolchain.cmake
-      - name: Build iOS
+      - name: Configure
+        run: cmake -B build -S .
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Package .zip
         run: |
-          mkdir build
-          cd build
-          cmake .. \
-            -DCMAKE_TOOLCHAIN_FILE=$PWD/../ios.toolchain.cmake \
-            -DPLATFORM=OS64 \
-            -DCMAKE_BUILD_TYPE=Release
-          cmake --build . --config Release
-          cp *.dylib ../xx0wq.video.importer.ios.dylib
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ios-binary
-          path: xx0wq.video.importer.ios.dylib
-
-  package:
-    needs: [build-windows, build-macos, build-android, build-ios]
-    runs-on: ubuntu-latest
-    outputs:
-      mod_version: ${{ steps.get_version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Create dist folder
-        run: mkdir -p dist
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-
-      - name: Get version from mod.json
-        id: get_version
-        run: |
-          VERSION=$(jq -r '.version' mod.json)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Validate binaries
-        run: |
-          echo "Checking for expected binaries..."
-          ls dist || echo "dist folder missing"
-          ls dist/* || echo "No binaries found"
-          ls dist/xx0wq.video.importer.* || echo "Some binaries may be missing"
-
-      - name: Create dist/final folder
-        run: mkdir -p dist/final
-
-      - name: Create packages
-        run: |
-          cp mod.json dist/
+          mkdir -p dist
+          cp -r build/* dist/
           cp -r resources dist/
-          cp -r .github/workflows dist/workflows/
-          cd dist
-          zip -r final/video_importer.zip mod.json resources workflows xx0wq.video.importer.*.*
-          cp final/video_importer.zip final/xx0wq.video.importer.geode
+          zip -r video_importer.zip dist
 
-      - name: Generate checksums
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: video_importer-build
+          path: video_importer.zip
+
+      - name: Check commit message
+        id: commitmsg
         run: |
-          cd dist/final
-          sha256sum video_importer.zip > video_importer.zip.sha256
-          sha256sum xx0wq.video.importer.geode > xx0wq.video.importer.geode.sha256
-          echo "## SHA256 Checksums" > checksums.txt
-          echo "\n**video_importer.zip**" >> checksums.txt
-          cat video_importer.zip.sha256 >> checksums.txt
-          echo "\n**xx0wq.video.importer.geode**" >> checksums.txt
-          cat xx0wq.video.importer.geode.sha256 >> checksums.txt
+          COMMIT_MSG="$(git log -1 --pretty=%B)"
+          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: video_importer-package
-          path: dist/final/*
+      - name: Skip release if commit says dont upload
+        if: contains(steps.commitmsg.outputs.message, 'dont upload')
+        run: echo "Skipping release due to commit message"
 
-  release:
-    needs: package
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: video_importer-package
-          path: dist/final
+      - name: Extract release version
+        id: version
+        if: contains(steps.commitmsg.outputs.message, 'release')
+        run: |
+          VERSION=$(echo "${{ steps.commitmsg.outputs.message }}" | sed -n 's/.*release \([0-9]\+\).*/\1/p')
+          FULL_VERSION="0.70.${VERSION}"
+          echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Upload to Release
+      - name: Update mod.json version
+        if: contains(steps.commitmsg.outputs.message, 'release')
+        run: |
+          jq ".version = \"${{ steps.version.outputs.version }}\"" mod.json > mod.json.tmp
+          mv mod.json.tmp mod.json
+          echo "Updated mod.json version to ${{ steps.version.outputs.version }}"
+
+      - name: Commit updated mod.json
+        if: contains(steps.commitmsg.outputs.message, 'release')
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod.json
+          git commit -m "chore: bump mod.json version to ${{ steps.version.outputs.version }}"
+          git push
+
+      - name: Create Release
+        if: contains(steps.commitmsg.outputs.message, 'release')
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ needs.package.outputs.mod_version }}
-          name: Release v${{ needs.package.outputs.mod_version }}
-          files: |
-            dist/final/xx0wq.video.importer.geode
-            dist/final/xx0wq.video.importer.geode.sha256
-          body_path: dist/final/checksums.txt
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            Automated release build for commit:
+            ${{ steps.commitmsg.outputs.message }}
+          files: video_importer.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
