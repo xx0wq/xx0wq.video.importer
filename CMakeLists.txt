@@ -1,47 +1,24 @@
-cmake_minimum_required(VERSION 3.18)
-project(video_importer)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Sources
-set(SOURCES
-    src/main.cpp
-)
-
-# Build shared library
-add_library(${PROJECT_NAME} SHARED ${SOURCES})
-
-# Geode SDK
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${GEODE_SDK_DIR}/include
-)
-target_link_libraries(${PROJECT_NAME} geode)
-
-# FFmpeg
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
-    libavcodec
-    libavformat
-    libavutil
-    libswscale
-)
-target_link_libraries(${PROJECT_NAME} PkgConfig::FFMPEG)
-
-# Platform-specific output names
-if(WIN32)
-    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "xx0wq.video.importer.win64")
-elseif(APPLE)
-    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "xx0wq.video.importer.macos")
-elseif(ANDROID)
-    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "xx0wq.video.importer.android${ANDROID_ABI}")
-elseif(IOS)
-    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "xx0wq.video.importer.ios")
+# --- FFmpeg linking ---
+if(NOT WIN32)
+    # Linux/macOS: use pkg-config to find system FFmpeg
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+        libavcodec
+        libavformat
+        libavutil
+        libswscale
+    )
+    target_link_libraries(${PROJECT_NAME} PkgConfig::FFMPEG)
+else()
+    # Windows: link against FFmpeg libs directly (assuming they are installed)
+    # Adjust paths if your FFmpeg dev build is in a different location
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        $ENV{FFMPEG_DIR}/include
+    )
+    target_link_libraries(${PROJECT_NAME}
+        $ENV{FFMPEG_DIR}/lib/avcodec.lib
+        $ENV{FFMPEG_DIR}/lib/avformat.lib
+        $ENV{FFMPEG_DIR}/lib/avutil.lib
+        $ENV{FFMPEG_DIR}/lib/swscale.lib
+    )
 endif()
-
-# Copy resources after build
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/resources
-        $<TARGET_FILE_DIR:${PROJECT_NAME}>/resources
-)
