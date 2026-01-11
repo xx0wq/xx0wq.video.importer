@@ -12,7 +12,7 @@ endif()
 
 include_directories("${GEODE_SDK_DIR}/include")
 
-# Platform detection
+# Platform detection and defines
 if(WIN32)
     add_definitions(-DGEODE_PLATFORM_WINDOWS=1)
 elseif(APPLE)
@@ -36,45 +36,34 @@ set(SOURCES
 # Build shared library (mod binary)
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
-# Output name matches workflow expectations
+# Output names to match workflow packaging
 if(WIN32)
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        OUTPUT_NAME "xx0wq.video.importer.win64"
-    )
+    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "xx0wq.video_importer.win64")
 elseif(APPLE)
     if(IOS)
-        set_target_properties(${PROJECT_NAME} PROPERTIES
-            OUTPUT_NAME "xx0wq.video.importer.ios"
-        )
+        set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "xx0wq.video_importer.ios")
     else()
-        set_target_properties(${PROJECT_NAME} PROPERTIES
-            OUTPUT_NAME "xx0wq.video.importer.macos"
-        )
+        set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "xx0wq.video_importer.macos")
     endif()
 elseif(ANDROID)
     if(${ANDROID_ABI} STREQUAL "arm64-v8a")
-        set_target_properties(${PROJECT_NAME} PROPERTIES
-            OUTPUT_NAME "xx0wq.video.importer.android64"
-        )
+        set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "xx0wq.video_importer.android64")
     else()
-        set_target_properties(${PROJECT_NAME} PROPERTIES
-            OUTPUT_NAME "xx0wq.video.importer.android32"
-        )
+        set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "xx0wq.video_importer.android32")
     endif()
 endif()
 
-# Link FFmpeg (for video importer functionality)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
-    libavcodec
-    libavformat
-    libavutil
-    libswscale
-)
-
-target_link_libraries(${PROJECT_NAME}
-    PkgConfig::FFMPEG
-)
+# Link FFmpeg only on desktop platforms
+if(NOT ANDROID AND NOT IOS)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
+        libavcodec
+        libavformat
+        libavutil
+        libswscale
+    )
+    target_link_libraries(${PROJECT_NAME} PkgConfig::FFMPEG)
+endif()
 
 # Install step (optional, for packaging)
 install(TARGETS ${PROJECT_NAME}
