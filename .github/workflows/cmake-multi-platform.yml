@@ -13,31 +13,63 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Geode SDK headers
+      - name: Prepare include folder
+        run: mkdir -p setup/include
+
+      - name: Fetch Geode SDK headers (online first, local fallback)
         run: |
           set -e
-          mkdir -p setup/include
-          echo "Attempting to download Geode SDK headers..."
-          if git clone --depth=1 https://github.com/geode-sdk/bindings.git tmp_bindings; then
-            cp -r tmp_bindings/include/Geode setup/include/
-            rm -rf tmp_bindings
-            echo "Geode SDK headers downloaded successfully."
+          SDK_SRC="loader/include/Geode"
+
+          echo "Attempting to download Geode SDK headers from geode-sdk/geode:${SDK_SRC}..."
+          if git clone --depth=1 https://github.com/geode-sdk/geode.git tmp_geode; then
+            if [ -d "tmp_geode/${SDK_SRC}" ]; then
+              rm -rf setup/include/Geode
+              cp -r "tmp_geode/${SDK_SRC}" setup/include/
+              echo "Downloaded headers copied to setup/include/Geode"
+            else
+              echo "Online repo doesn't contain ${SDK_SRC} as expected."
+              exit 1
+            fi
+            rm -rf tmp_geode
           else
             echo "Download failed. Falling back to repo headers."
-            if [ ! -f "setup/include/Geode/Enums.hpp" ] || \
-               [ ! -f "setup/include/Geode/platform/cplatform.h" ] || \
-               [ ! -f "setup/include/Geode/c++stl/gdstdlib.hpp" ]; then
-              echo "Fallback headers are incomplete. Build cannot proceed."
+          fi
+
+          echo "Verifying header presence..."
+          if [ ! -d "setup/include/Geode" ]; then
+            echo "setup/include/Geode not found after download; checking local fallback..."
+            # Local fallback must already exist in the repo
+            if [ ! -d "setup/include/Geode" ]; then
+              echo "Local fallback also missing: setup/include/Geode"
               exit 1
             fi
           fi
+
+          # Critical file checks (support both Enums.hpp and enums.hpp casing)
+          if [ ! -f "setup/include/Geode/Enums.hpp" ] && [ ! -f "setup/include/Geode/enums.hpp" ]; then
+            echo "Missing Enums.hpp (or enums.hpp)"
+            exit 1
+          fi
+          if [ ! -f "setup/include/Geode/platform/cplatform.h" ] && [ ! -f "setup/include/Geode/platform/platform.h" ]; then
+            echo "Missing platform header (cplatform.h or platform.h)"
+            exit 1
+          fi
+          if [ ! -f "setup/include/Geode/c++stl/gdstdlib.hpp" ]; then
+            echo "Missing c++stl/gdstdlib.hpp"
+            exit 1
+          fi
+
+          echo "Header check passed."
+          echo "Tree (top-level Geode):"
+          ls -1 setup/include/Geode | head -n 50
 
       - name: Install FFmpeg dev libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg pkg-config libavcodec-dev:amd64 libavformat-dev:amd64 libavutil-dev:amd64 libswscale-dev:amd64
 
-      - name: Configure CMake
+      - name: Configure CMake (Android 64)
         run: cmake -B build -S . -DGEODE_SDK_DIR="$PWD/setup" -DGEODE_PLATFORM_ANDROID=1
 
       - name: Build
