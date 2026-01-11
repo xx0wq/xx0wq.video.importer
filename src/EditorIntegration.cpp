@@ -1,39 +1,23 @@
 #include "EditorIntegration.hpp"
 #include "Utils.hpp"
+#include "ColorMapper.hpp"
 
-// You’ll replace these stubs with actual Geode/GD calls:
-// - createBlock(x, y) -> place object in editor
-// - createColorTrigger(groupId, color, atTime) -> schedule color change
-
-// Example object placement stub
+// Replace these with Geode/GD implementations:
 static void placeBlock(EditorContext* ctx, int gridX, int gridY, int groupId) {
-    // Compute world position
-    float x = ctx->startX + gridX * ctx->cellSize;
-    float y = ctx->startY + gridY * ctx->cellSize;
-
-    // TODO: Replace with Geode/GD object creation, e.g.:
-    // auto obj = editor->createObject(kBlockID, x, y);
-    // obj->addToGroup(groupId);
-
-    (void)x; (void)y; (void)groupId;
+    (void)ctx; (void)gridX; (void)gridY; (void)groupId;
+    // Compute world position and create the block in the editor, assign to groupId.
 }
 
-// Example trigger creation stub
 static void addColorTrigger(EditorContext* ctx, int groupId, int channel,
-                            const PixelRGB& col, float atSeconds) {
-    // TODO: Replace with actual color trigger creation:
-    // trigger->setGroup(groupId)
-    // trigger->setChannel(channel)
-    // trigger->setRGB(col.r, col.g, col.b)
-    // trigger->setActivateTime(atSeconds + ctx->songOffsetSeconds)
-
-    (void)groupId; (void)channel; (void)col; (void)atSeconds;
+                            const PixelRGB& rgb, float atSeconds) {
+    (void)ctx; (void)groupId; (void)channel; (void)rgb; (void)atSeconds;
+    // Create a color trigger targeting 'channel', scheduled at 'atSeconds',
+    // and apply the RGB values. Associate trigger with 'groupId' if needed.
 }
 
 int EditorIntegration::mapPixelToColorChannel(const PixelRGB& p) {
-    // Simple hashing to distribute colors across channels 1–999
-    int ch = 1 + ((p.r * 31 + p.g * 17 + p.b * 13) % 999);
-    return ch;
+    // Distribute across channels for concurrency; tune as needed
+    return 1 + ((p.r * 31 + p.g * 17 + p.b * 13) % 999);
 }
 
 bool EditorIntegration::createObjectsAndTriggers(EditorContext* ctx,
@@ -44,31 +28,38 @@ bool EditorIntegration::createObjectsAndTriggers(EditorContext* ctx,
     int groupId = ctx->nextGroupID;
     float frameDuration = 1.0f / static_cast<float>(fps);
 
-    // Place static grid of blocks once based on resolution (grouped)
-    for (int gy = 0; gy < res; ++gy) {
-        for (int gx = 0; gx < res; ++gx) {
+    // Place static resolution grid once
+    for (int gy = 0; gy < res; ++gy)
+        for (int gx = 0; gx < res; ++gx)
             placeBlock(ctx, gx, gy, groupId);
-        }
-    }
 
-    // For each frame, add color triggers distributed across channels
+    // Per-frame HVS color triggers
     for (size_t i = 0; i < frames.size(); ++i) {
         const auto& f = frames[i];
         float t = ctx->songOffsetSeconds + static_cast<float>(i) * frameDuration;
 
-        // Map each cell to a pixel (nearest neighbor downsample)
         for (int gy = 0; gy < res; ++gy) {
             for (int gx = 0; gx < res; ++gx) {
-                int px = gx * f.width / res;
+                int px = gx * f.width  / res;
                 int py = gy * f.height / res;
-                PixelRGB p = f.at(px, py);
-                int ch = mapPixelToColorChannel(p);
-                addColorTrigger(ctx, groupId, ch, p, t);
+                PixelRGB src = f.at(px, py);
+
+                // Convert RGB -> HSV then back to RGB to enforce HVS mapping behavior
+                HSV hsv = ColorMapper::rgbToHSV(src);
+                PixelRGB mapped = ColorMapper::hsvToRGB(hsv);
+
+                int channel = mapPixelToColorChannel(src);
+                addColorTrigger(ctx, groupId, channel, mapped, t);
             }
         }
     }
 
-    // Grouping and finalization (if needed)
-    // TODO: Apply editor grouping APIs once integrated.
     return true;
+}
+
+void EditorIntegration::previewFrames(const std::vector<FrameData>& frames, int fps) {
+    (void)frames; (void)fps;
+    // Implement temporary preview using scheduled triggers,
+    // or draw to a preview layer without placing permanent objects.
+    Utils::notify("Preview started (stub).");
 }
