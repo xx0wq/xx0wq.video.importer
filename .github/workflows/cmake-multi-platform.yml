@@ -19,72 +19,13 @@ jobs:
       - name: Prepare headers
         shell: bash
         run: |
-          mkdir -p include/Geode/utils
-          mkdir -p include/Geode/c++stl
-          mkdir -p include/fmt
-
-          # Copy repo headers
+          mkdir -p include/Geode/utils include/Geode/c++stl include/fmt
           cp -r setup/include/Geode/* include/Geode/ || true
           cp -r setup/include/Geode/c++stl/* include/Geode/c++stl/ || true
-
-          # Ensure stubs exist
-          cat > include/Geode/Result.hpp <<'EOF'
-          #pragma once
-          #include <string>
-          #include <utility>
-          namespace geode {
-              template <typename T>
-              class Result {
-              public:
-                  bool ok;
-                  T value;
-                  std::string error;
-                  Result(T v) : ok(true), value(std::move(v)) {}
-                  Result(std::string e) : ok(false), error(std::move(e)) {}
-                  bool isOk() const { return ok; }
-                  T unwrap() const { return value; }
-              };
-              template <> class Result<void> {
-              public:
-                  bool ok;
-                  std::string error;
-                  Result() : ok(true) {}
-                  Result(std::string e) : ok(false), error(std::move(e)) {}
-                  bool isOk() const { return ok; }
-              };
-              template <typename T> Result<T> Ok(T v) { return Result<T>(v); }
-              inline Result<void> Err(std::string e) { return Result<void>(e); }
-          }
-          EOF
-
-          cat > include/matjson.hpp <<'EOF'
-          #pragma once
-          #include <string>
-          #include <map>
-          namespace matjson {
-              class Value {
-                  std::string str;
-                  std::map<std::string, Value> obj;
-              public:
-                  Value() {}
-                  Value(std::string s) : str(std::move(s)) {}
-                  std::string as_string() const { return str; }
-                  int as_int() const { return std::stoi(str); }
-                  Value& operator[](const std::string& key) { return obj[key]; }
-              };
-              inline Value parse(const std::string& s) { return Value(s); }
-          }
-          EOF
-
-          cat > include/fmt/format.h <<'EOF'
-          #pragma once
-          #include <string>
-          namespace fmt {
-              template <typename... Args>
-              std::string format(const std::string& s, Args&&...) { return s; }
-          }
-          EOF
-
+          # Stubs
+          echo '#pragma once\n#include <string>\nnamespace geode { template<typename T> class Result { public: bool ok; T value; std::string error; Result(T v):ok(true),value(v){} Result(std::string e):ok(false),error(e){} bool isOk()const{return ok;} T unwrap()const{return value;} }; template<> class Result<void>{ public: bool ok; std::string error; Result():ok(true){} Result(std::string e):ok(false),error(e){} bool isOk()const{return ok;} }; template<typename T> Result<T> Ok(T v){return Result<T>(v);} inline Result<void> Err(std::string e){return Result<void>(e);} }' > include/Geode/Result.hpp
+          echo '#pragma once\n#include <string>\n#include <map>\nnamespace matjson { class Value { std::string str; std::map<std::string,Value> obj; public: Value(){} Value(std::string s):str(s){} std::string as_string()const{return str;} int as_int()const{return std::stoi(str);} Value& operator[](const std::string& k){return obj[k];} }; inline Value parse(const std::string&s){return Value(s);} }' > include/matjson.hpp
+          echo '#pragma once\n#include <string>\nnamespace fmt { template<typename...Args> std::string format(const std::string&s,Args&&...){return s;} }' > include/fmt/format.h
       - name: Setup MSVC Dev Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
       - name: Build Windows DLL
@@ -102,35 +43,142 @@ jobs:
           name: win64-binary
           path: build/xx0wq.video.importer.win64.dll
 
-  # Repeat the same "Prepare headers" block for macos, linux, android, ios jobs
-  # (identical stub creation, just different build commands)
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: brew install ffmpeg fmt
+      - name: Prepare headers
+        run: |
+          mkdir -p include/Geode/utils include/Geode/c++stl include/fmt
+          cp -r setup/include/Geode/* include/Geode/ || true
+          cp -r setup/include/Geode/c++stl/* include/Geode/c++stl/ || true
+          # same stubs as above...
+      - name: Build macOS dylib
+        run: |
+          mkdir -p build
+          clang++ -std=${{ env.CXX_STD }} -DGEODE_PLATFORM_MACOS=1 \
+            -I include \
+            -dynamiclib src/*.cpp -o build/xx0wq.video.importer.macos.dylib
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-binary
+          path: build/xx0wq.video.importer.macos.dylib
 
-  package:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libfmt-dev
+      - name: Prepare headers
+        run: |
+          mkdir -p include/Geode/utils include/Geode/c++stl include/fmt
+          cp -r setup/include/Geode/* include/Geode/ || true
+          cp -r setup/include/Geode/c++stl/* include/Geode/c++stl/ || true
+          # same stubs...
+      - name: Build Linux .so
+        run: |
+          mkdir -p build
+          clang++ -std=${{ env.CXX_STD }} -DGEODE_PLATFORM_LINUX=1 \
+            -I include \
+            -fPIC -shared src/*.cpp \
+            -o build/xx0wq.video.importer.linux.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-binary
+          path: build/xx0wq.video.importer.linux.so
+
+  build-android:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare headers
+        run: |
+          mkdir -p include/Geode/utils include/Geode/c++stl include/fmt
+          cp -r setup/include/Geode/* include/Geode/ || true
+          cp -r setup/include/Geode/c++stl/* include/Geode/c++stl/ || true
+          # same stubs...
+      - uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+      - name: Build Android ${{ matrix.abi }}
+        run: |
+          mkdir -p build
+          $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ \
+            -std=${{ env.CXX_STD }} \
+            -DGEODE_PLATFORM_ANDROID=1 \
+            -DGEODE_DLL= \
+            -DVIDEO_IMPORTER_NO_FFMPEG=1 \
+            -DVIDEO_IMPORTER_NO_COCOS=1 \
+            -I include \
+            -fPIC -shared src/*.cpp \
+            -o build/xx0wq.video.importer.${{ matrix.abi == 'arm64-v8a' && 'android64' || 'android32' }}.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.abi }}-binary
+          path: build/xx0wq.video.importer.android*.so
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare headers
+        run: |
+          mkdir -p include/Geode/utils include/Geode/c++stl include/fmt
+          cp -r setup/include/Geode/* include/Geode/ || true
+          cp -r setup/include/Geode/c++stl/* include/Geode/c++stl/ || true
+          # same stubs...
+      - name: Build iOS dylib
+        run: |
+          mkdir -p build
+          clang++ -std=${{ env.CXX_STD }} \
+            -DGEODE_PLATFORM_IOS=1 \
+            -DGEODE_DLL= \
+            -DVIDEO_IMPORTER_NO_FFMPEG=1 \
+            -DVIDEO_IMPORTER_NO_COCOS=1 \
+            -I include \
+            -fPIC -shared src/*.cpp \
+            -o build/xx0wq.video.importer.ios.dylib
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-binary
+          path: build/xx0wq.video.importer.ios.dylib
+          
+   package:
     needs: [build-windows, build-macos, build-linux, build-android, build-ios]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist/artifacts
+
       - name: Get version from mod.json
         id: get_version
         run: |
           VERSION=$(jq -r '.version' mod.json)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Assemble package
         run: |
           mkdir -p dist/package
           cp mod.json dist/package/
           if [ -d resources ]; then cp -r resources dist/package/; fi
-          find dist/artifacts -type f -name "*.dll" -exec cp {} dist/package/ \;
+          find dist/artifacts -type f -name "*.dll"   -exec cp {} dist/package/ \;
           find dist/artifacts -type f -name "*.dylib" -exec cp {} dist/package/ \;
-          find dist/artifacts -type f -name "*.so" -exec cp {} dist/package/ \;
+          find dist/artifacts -type f -name "*.so"    -exec cp {} dist/package/ \;
           cd dist/package
           zip -r "video_importer_${{ steps.get_version.outputs.version }}.zip" .
+
       - name: Upload packaged zip
         uses: actions/upload-artifact@v4
         with:
@@ -145,6 +193,7 @@ jobs:
         with:
           name: package
           path: dist
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
