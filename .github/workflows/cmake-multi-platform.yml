@@ -5,8 +5,7 @@ permissions:
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -20,12 +19,8 @@ jobs:
       - name: Prepare headers
         run: |
           mkdir -p include
-          cp -r loader/include/* include/ || true
-          cp bindings/include/Geode/Enums.hpp include/Geode/ || true
-          cp -r matjson/include/* include/ || true
-          cp -r stubs/cocos2d/* include/cocos2d/ || true
-          cp stubs/GameObject.hpp include/Geode/ || true
-          echo "#pragma once" > include/Geode/GeneratedBinding.hpp
+          cp -r setup/include/Geode/* include/Geode/
+          cp -r setup/include/Geode/cocos2d include/Geode/
       - name: Setup MSVC Dev Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
       - name: Build Windows DLL
@@ -47,17 +42,13 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install FFmpeg (macOS)
+      - name: Install FFmpeg
         run: brew install ffmpeg
       - name: Prepare headers
         run: |
           mkdir -p include
-          cp -r loader/include/* include/ || true
-          cp bindings/include/Geode/Enums.hpp include/Geode/ || true
-          cp -r matjson/include/* include/ || true
-          cp -r stubs/cocos2d/* include/cocos2d/ || true
-          cp stubs/GameObject.hpp include/Geode/ || true
-          echo "#pragma once" > include/Geode/GeneratedBinding.hpp
+          cp -r setup/include/Geode/* include/Geode/
+          cp -r setup/include/Geode/cocos2d include/Geode/
       - name: Build macOS dylib
         run: |
           mkdir -p build
@@ -73,19 +64,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install FFmpeg dev libs (Linux)
+      - name: Install FFmpeg dev libs
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg pkg-config libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
       - name: Prepare headers
         run: |
           mkdir -p include
-          cp -r loader/include/* include/ || true
-          cp bindings/include/Geode/Enums.hpp include/Geode/ || true
-          cp -r matjson/include/* include/ || true
-          cp -r stubs/cocos2d/* include/cocos2d/ || true
-          cp stubs/GameObject.hpp include/Geode/ || true
-          echo "#pragma once" > include/Geode/GeneratedBinding.hpp
+          cp -r setup/include/Geode/* include/Geode/
+          cp -r setup/include/Geode/cocos2d include/Geode/
       - name: Build Linux .so
         run: |
           mkdir -p build
@@ -108,11 +95,8 @@ jobs:
       - name: Prepare headers
         run: |
           mkdir -p include
-          cp -r loader/include/* include/ || true
-          cp bindings/include/Geode/Enums.hpp include/Geode/ || true
-          cp -r matjson/include/* include/ || true
-          cp -r stubs/cocos2d/* include/cocos2d/ || true
-          cp stubs/GameObject.hpp include/Geode/ || true
+          cp -r setup/include/Geode/* include/Geode/
+          cp -r setup/include/Geode/cocos2d include/Geode/
           echo "#pragma once" > include/Geode/GeneratedBinding.hpp
       - name: Patch Geode headers
         run: |
@@ -145,11 +129,8 @@ jobs:
       - name: Prepare headers
         run: |
           mkdir -p include
-          cp -r loader/include/* include/ || true
-          cp bindings/include/Geode/Enums.hpp include/Geode/ || true
-          cp -r matjson/include/* include/ || true
-          cp -r stubs/cocos2d/* include/cocos2d/ || true
-          cp stubs/GameObject.hpp include/Geode/ || true
+          cp -r setup/include/Geode/* include/Geode/
+          cp -r setup/include/Geode/cocos2d include/Geode/
           echo "#pragma once" > include/Geode/GeneratedBinding.hpp
       - name: Patch Geode headers
         run: |
