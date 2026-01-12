@@ -229,3 +229,24 @@ jobs:
       - name: Upload packaged zip
         uses: actions/upload-artifact@v4
         with:
+          name: package
+          path: dist/package/video_importer_${{ steps.get_version.outputs.version }}.zip
+
+  release:
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: dist
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.package.outputs.version }}
+          name: Video Importer v${{ needs.package.outputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/video_importer_${{ needs.package.outputs.version }}.zip
