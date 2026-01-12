@@ -17,10 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Prepare headers
+        shell: cmd
         run: |
-          mkdir -p include
-          cp -r setup/include/Geode/* include/Geode/
-          cp -r setup/include/Geode/cocos2d include/Geode/
+          if not exist include mkdir include
+          if not exist include\Geode mkdir include\Geode
+          if not exist include\Geode\cocos2d mkdir include\Geode\cocos2d
+          xcopy /E /I /Y setup\include\Geode include\Geode
+          xcopy /E /I /Y setup\include\Geode\cocos2d include\Geode\cocos2d
+          if not exist include\Geode\GeneratedBinding.hpp (
+            echo #pragma once > include\Geode\GeneratedBinding.hpp
+          )
       - name: Setup MSVC Dev Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
       - name: Build Windows DLL
@@ -46,9 +52,10 @@ jobs:
         run: brew install ffmpeg
       - name: Prepare headers
         run: |
-          mkdir -p include
+          mkdir -p include/Geode/cocos2d
           cp -r setup/include/Geode/* include/Geode/
-          cp -r setup/include/Geode/cocos2d include/Geode/
+          cp -r setup/include/Geode/cocos2d/* include/Geode/cocos2d/
+          [ ! -f include/Geode/GeneratedBinding.hpp ] && echo "#pragma once" > include/Geode/GeneratedBinding.hpp
       - name: Build macOS dylib
         run: |
           mkdir -p build
@@ -70,9 +77,10 @@ jobs:
           sudo apt-get install -y ffmpeg pkg-config libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
       - name: Prepare headers
         run: |
-          mkdir -p include
+          mkdir -p include/Geode/cocos2d
           cp -r setup/include/Geode/* include/Geode/
-          cp -r setup/include/Geode/cocos2d include/Geode/
+          cp -r setup/include/Geode/cocos2d/* include/Geode/cocos2d/
+          [ ! -f include/Geode/GeneratedBinding.hpp ] && echo "#pragma once" > include/Geode/GeneratedBinding.hpp
       - name: Build Linux .so
         run: |
           mkdir -p build
@@ -94,9 +102,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Prepare headers
         run: |
-          mkdir -p include
+          mkdir -p include/Geode/cocos2d
           cp -r setup/include/Geode/* include/Geode/
-          cp -r setup/include/Geode/cocos2d include/Geode/
+          cp -r setup/include/Geode/cocos2d/* include/Geode/cocos2d/
           echo "#pragma once" > include/Geode/GeneratedBinding.hpp
       - name: Patch Geode headers
         run: |
@@ -128,9 +136,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Prepare headers
         run: |
-          mkdir -p include
+          mkdir -p include/Geode/cocos2d
           cp -r setup/include/Geode/* include/Geode/
-          cp -r setup/include/Geode/cocos2d include/Geode/
+          cp -r setup/include/Geode/cocos2d/* include/Geode/cocos2d/
           echo "#pragma once" > include/Geode/GeneratedBinding.hpp
       - name: Patch Geode headers
         run: |
