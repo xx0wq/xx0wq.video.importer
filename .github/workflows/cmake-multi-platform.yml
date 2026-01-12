@@ -1,4 +1,4 @@
-name: Geode Mod Build & Release (Patched Mobile)
+name: Geode Mod Build
 
 permissions:
   contents: write
@@ -13,7 +13,7 @@ env:
   CXX_STD: c++20
 
 jobs:
-   build-windows:
+  build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +34,6 @@ jobs:
       - name: Build Windows DLL
         shell: cmd
         run: |
-          if not exist build mkdir build
           setlocal enabledelayedexpansion
           set SRC=
           for %%f in (src\*.cpp) do set SRC=!SRC! "%%f"
@@ -149,7 +148,7 @@ jobs:
           name: android-${{ matrix.abi }}-binary
           path: build/xx0wq.video.importer.android*.so
 
-   build-ios:
+  build-ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
