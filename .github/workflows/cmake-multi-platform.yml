@@ -5,11 +5,12 @@ permissions:
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 env:
-  CXX_STD: c++20
+  CXX_STD: "c++20"
 
 jobs:
   build-windows:
