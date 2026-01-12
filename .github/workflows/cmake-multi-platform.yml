@@ -149,7 +149,7 @@ jobs:
           name: android-${{ matrix.abi }}-binary
           path: build/xx0wq.video.importer.android*.so
 
-  build-ios:
+   build-ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
