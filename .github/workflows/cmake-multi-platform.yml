@@ -12,7 +12,7 @@ on:
 env:
   CXX_STD: "c++20"
 
-jobs:
+ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
