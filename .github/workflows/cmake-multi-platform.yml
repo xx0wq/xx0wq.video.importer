@@ -23,17 +23,18 @@ jobs:
         run: |
           mkdir -p include/Geode include/Geode/utils include/Geode/c++stl include/fmt include/libavcodec include/libavformat
 
-          # Copy Geode.hpp explicitly
+          # Copy your repo’s Geode headers if present
           cp setup/include/Geode/Geode.hpp include/Geode/ || true
           cp -r setup/include/Geode/* include/Geode/ || true
           cp -r setup/include/Geode/c++stl/* include/Geode/c++stl/ || true
 
-          # If any critical Geode headers are missing, pull the SDK
+          # If critical Geode headers are missing, fetch Geode SDK
           for f in include/Geode/Geode.hpp include/Geode/Result.hpp include/matjson.hpp include/fmt/format.h; do
             if [ ! -f "$f" ]; then
               echo "Critical file $f missing, downloading Geode SDK..."
               git clone --depth=1 https://github.com/geode-sdk/geode.git sdk_tmp
-              cp -r sdk_tmp/include/* include/
+              cp -r sdk_tmp/include/* include/ || true
+              cp -r sdk_tmp/loader/include/* include/ || true
               rm -rf sdk_tmp
               break
             fi
