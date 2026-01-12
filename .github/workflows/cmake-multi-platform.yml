@@ -11,8 +11,8 @@ on:
 
 env:
   CXX_STD: "c++20"
-  
- jobs:
+
+jobs:
   build-windows:
     runs-on: windows-latest
     steps:
@@ -23,10 +23,61 @@ env:
           mkdir -p include/Geode/utils include/Geode/c++stl include/fmt
           cp -r setup/include/Geode/* include/Geode/ || true
           cp -r setup/include/Geode/c++stl/* include/Geode/c++stl/ || true
-          # Stubs
-          echo '#pragma once\n#include <string>\nnamespace geode { template<typename T> class Result { public: bool ok; T value; std::string error; Result(T v):ok(true),value(v){} Result(std::string e):ok(false),error(e){} bool isOk()const{return ok;} T unwrap()const{return value;} }; template<> class Result<void>{ public: bool ok; std::string error; Result():ok(true){} Result(std::string e):ok(false),error(e){} bool isOk()const{return ok;} }; template<typename T> Result<T> Ok(T v){return Result<T>(v);} inline Result<void> Err(std::string e){return Result<void>(e);} }' > include/Geode/Result.hpp
-          echo '#pragma once\n#include <string>\n#include <map>\nnamespace matjson { class Value { std::string str; std::map<std::string,Value> obj; public: Value(){} Value(std::string s):str(s){} std::string as_string()const{return str;} int as_int()const{return std::stoi(str);} Value& operator[](const std::string& k){return obj[k];} }; inline Value parse(const std::string&s){return Value(s);} }' > include/matjson.hpp
-          echo '#pragma once\n#include <string>\nnamespace fmt { template<typename...Args> std::string format(const std::string&s,Args&&...){return s;} }' > include/fmt/format.h
+          # Stub headers
+          cat > include/Geode/Result.hpp <<'EOF'
+          #pragma once
+          #include <string>
+          #include <utility>
+          namespace geode {
+              template <typename T>
+              class Result {
+              public:
+                  bool ok;
+                  T value;
+                  std::string error;
+                  Result(T v) : ok(true), value(std::move(v)) {}
+                  Result(std::string e) : ok(false), error(std::move(e)) {}
+                  bool isOk() const { return ok; }
+                  T unwrap() const { return value; }
+              };
+              template <> class Result<void> {
+              public:
+                  bool ok;
+                  std::string error;
+                  Result() : ok(true) {}
+                  Result(std::string e) : ok(false), error(std::move(e)) {}
+                  bool isOk() const { return ok; }
+              };
+              template <typename T> Result<T> Ok(T v) { return Result<T>(v); }
+              inline Result<void> Err(std::string e) { return Result<void>(e); }
+          }
+          EOF
+          cat > include/matjson.hpp <<'EOF'
+          #pragma once
+          #include <string>
+          #include <map>
+          namespace matjson {
+              class Value {
+                  std::string str;
+                  std::map<std::string, Value> obj;
+              public:
+                  Value() {}
+                  Value(std::string s) : str(std::move(s)) {}
+                  std::string as_string() const { return str; }
+                  int as_int() const { return std::stoi(str); }
+                  Value& operator[](const std::string& key) { return obj[key]; }
+              };
+              inline Value parse(const std::string& s) { return Value(s); }
+          }
+          EOF
+          cat > include/fmt/format.h <<'EOF'
+          #pragma once
+          #include <string>
+          namespace fmt {
+              template <typename... Args>
+              std::string format(const std::string& s, Args&&...) { return s; }
+          }
+          EOF
       - name: Setup MSVC Dev Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
       - name: Build Windows DLL
@@ -149,8 +200,9 @@ env:
         with:
           name: ios-binary
           path: build/xx0wq.video.importer.ios.dylib
-          
-   package:
+
+  
+  package:
     needs: [build-windows, build-macos, build-linux, build-android, build-ios]
     runs-on: ubuntu-latest
     outputs:
