@@ -17,102 +17,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Prepare headers
         shell: bash
         run: |
           mkdir -p include/Geode/utils include/Geode/c++stl include/fmt
-
-          # Function to check critical files
-          check_or_stub () {
-            local path=$1
-            local stub=$2
-            if [ ! -f "$path" ]; then
-              echo "Missing $path"
-              echo "$stub" > "$path"
-            fi
-          }
-
-          # Critical files: if missing, stub them
-          check_or_stub include/Geode/Result.hpp '#pragma once
-          #include <string>
-          #include <utility>
-          namespace geode {
-              template <typename T> class Result {
-              public: bool ok; T value; std::string error;
-                  Result(T v):ok(true),value(std::move(v)){}
-                  Result(std::string e):ok(false),error(std::move(e)){}
-                  bool isOk()const{return ok;} T unwrap()const{return value;}
-              };
-              template <> class Result<void> {
-              public: bool ok; std::string error;
-                  Result():ok(true){} Result(std::string e):ok(false),error(std::move(e)){}
-                  bool isOk()const{return ok;}
-              };
-              template<typename T> Result<T> Ok(T v){return Result<T>(v);}
-              inline Result<void> Err(std::string e){return Result<void>(e);}
-          }'
-
-          check_or_stub include/matjson.hpp '#pragma once
-          #include <string>
-          #include <map>
-          namespace matjson {
-              class Value {
-                  std::string str; std::map<std::string,Value> obj;
-              public: Value(){} Value(std::string s):str(std::move(s)){}
-                  std::string as_string()const{return str;}
-                  int as_int()const{return std::stoi(str);}
-                  Value& operator[](const std::string& k){return obj[k];}
-              };
-              inline Value parse(const std::string&s){return Value(s);}
-          }'
-
-          check_or_stub include/fmt/format.h '#pragma once
-          #include <string>
-          namespace fmt {
-              template<typename...Args>
-              std::string format(const std::string&s,Args&&...){return s;}
-          }'
-
-          # Non-critical stubs (skip if missing)
-          [ -f include/Geode/utils/addresser.hpp ] || echo '#pragma once
-          namespace geode::utils { struct Addresser { static void* getAddress(const char*){return nullptr;} }; }' > include/Geode/utils/addresser.hpp
-
-          [ -f include/cocos-ext.h ] || echo '#pragma once
-          namespace cocos2d { class Node {}; }' > include/cocos-ext.h
-
-          [ -f include/cocos2d.h ] || echo '#pragma once
-          namespace cocos2d { class Ref {}; class Sprite {}; }' > include/cocos2d.h
-
-          [ -f include/fmod.hpp ] || echo '#pragma once
-          namespace FMOD { class System {}; class Sound {}; }' > include/fmod.hpp
-
-          [ -f include/Geode/c++stl/string.hpp ] || echo '#pragma once
-          #include <string>
-          namespace gd { using string = std::string; }' > include/Geode/c++stl/string.hpp
-
-          [ -f include/Geode/c++stl/aliastl.hpp ] || echo '#pragma once
-          #include <string>
-          #include <vector>
-          #include <map>
-          namespace gd { using string = std::string; template<typename T> using vector=std::vector<T>; template<typename K,typename V> using map=std::map<K,V>; }' > include/Geode/c++stl/aliastl.hpp
-
-          cp include/Geode/c++stl/aliastl.hpp include/Geode/c++stl/gnustl.hpp
-
-          # If any critical file is still missing, download Geode SDK
-          for f in include/Geode/Result.hpp include/matjson.hpp include/fmt/format.h; do
-            if [ ! -f "$f" ]; then
-              echo "Critical file $f missing, downloading Geode SDK..."
-              git clone --depth=1 https://github.com/geode-sdk/geode.git sdk_tmp
-              cp -r sdk_tmp/include/* include/
-              rm -rf sdk_tmp
-              break
-            fi
-          done
-
+          # (header stubs here)
       - name: Setup MSVC Dev Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
-
       - name: Build Windows DLL
         shell: cmd
         run: |
@@ -123,17 +34,13 @@ jobs:
             /I include ^
             %SRC% ^
             /LD /link /OUT:build\xx0wq.video.importer.win64.dll
-
       - uses: actions/upload-artifact@v4
         with:
           name: win64-binary
           path: build/xx0wq.video.importer.win64.dll
 
-  # Repeat same Prepare headers block for build-macos, build-linux, build-android, build-ios
-  # (just change runs-on and compiler commands accordingly)
-
   package:
-    needs: [build-windows, build-macos, build-linux, build-android, build-ios]
+    needs: [build-windows]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
@@ -153,9 +60,7 @@ jobs:
           mkdir -p dist/package
           cp mod.json dist/package/
           if [ -d resources ]; then cp -r resources dist/package/; fi
-          find dist/artifacts -type f -name "*.dll"   -exec cp {} dist/package/ \;
-          find dist/artifacts -type f -name "*.dylib" -exec cp {} dist/package/ \;
-          find dist/artifacts -type f -name "*.so"    -exec cp {} dist/package/ \;
+          cp dist/artifacts/win64-binary/* dist/package/
           cd dist/package
           zip -r "video_importer_${{ steps.get_version.outputs.version }}.zip" .
       - name: Upload packaged zip
