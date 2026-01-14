@@ -1,191 +1,39 @@
-name: Geode Mod Build (Windows)
-
-permissions:
-  contents: write
-
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
   workflow_dispatch:
 
-env:
-  CXX_STD: "c++20"
-
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Prepare headers
-        shell: bash
-        run: |
-          mkdir -p include/Geode include/Geode/utils include/Geode/c++stl include/fmt \
-                   include/libavcodec include/libavformat include/libavutil include/libswscale
+      - uses: geode-sdk/setup-geode@v1
+        with:
+          version: 4.10.0
 
-          fetch_header () {
-            local file=$1
-            local relpath=$2
-
-            if [ -f "$file" ]; then
-              echo "Found $file locally."
-              return 0
-            fi
-
-            echo "Missing $file, trying geode-sdk/geode..."
-            git clone --depth=1 https://github.com/geode-sdk/geode.git sdk_tmp || true
-            cp -r sdk_tmp/geode/include/* include/ 2>/dev/null || true
-            cp -r sdk_tmp/loader/include/* include/ 2>/dev/null || true
-            rm -rf sdk_tmp
-            [ -f "$file" ] && { echo "Retrieved $file from geode repo."; return 0; }
-
-            echo "Still missing $file, checking setup/include..."
-            cp setup/include/$relpath "$file" 2>/dev/null || true
-            [ -f "$file" ] && { echo "Retrieved $file from setup/include."; return 0; }
-
-            echo "Still missing $file, trying geode-sdk/marvin..."
-            git clone --depth=1 https://github.com/geode-sdk/marvin.git marvin_tmp || true
-            cp -r marvin_tmp/include/* include/ 2>/dev/null || true
-            rm -rf marvin_tmp
-            [ -f "$file" ] && { echo "Retrieved $file from marvin repo."; return 0; }
-
-            echo "Still missing $file, searching setup/include..."
-            find setup/include -name "$(basename $file)" -exec cp {} "$file" \; 2>/dev/null || true
-            [ -f "$file" ] && { echo "Retrieved $file from setup/include search."; return 0; }
-
-            echo "Final attempt failed: $file not found."
-            return 1
-          }
-
-          # Critical headers
-          fetch_header include/Geode/Geode.hpp Geode/Geode.hpp
-          fetch_header include/Geode/Result.hpp Geode/Result.hpp
-          fetch_header include/matjson.hpp matjson.hpp
-          fetch_header include/fmt/format.h fmt/format.h
-
-          # FFmpeg stubs
-          cat > include/libavcodec/avcodec.h <<'EOF'
-#pragma once
-struct AVCodec {};
-EOF
-
-          cat > include/libavformat/avformat.h <<'EOF'
-#pragma once
-struct AVFormatContext {};
-EOF
-
-          cat > include/libavutil/avutil.h <<'EOF'
-#pragma once
-struct AVUtil {};
-EOF
-
-          cat > include/libswscale/swscale.h <<'EOF'
-#pragma once
-struct SwsContext {};
-EOF
-
-          # Cocos2d stub
-          [ -f include/cocos2d.h ] || cat > include/cocos2d.h <<'EOF'
-#pragma once
-namespace cocos2d { class Ref {}; class Sprite {}; struct CCRect { float x,y,w,h; }; }
-EOF
-
-          # Non-critical stubs
-          [ -f include/Geode/utils/addresser.hpp ] || cat > include/Geode/utils/addresser.hpp <<'EOF'
-#pragma once
-namespace geode::utils { struct Addresser { static void* getAddress(const char*){return nullptr;} }; }
-EOF
-
-          [ -f include/cocos-ext.h ] || cat > include/cocos-ext.h <<'EOF'
-#pragma once
-namespace cocos2d { class Node {}; }
-EOF
-
-          [ -f include/fmod.hpp ] || cat > include/fmod.hpp <<'EOF'
-#pragma once
-namespace FMOD { class System {}; class Sound {}; }
-EOF
-
-          [ -f include/Geode/c++stl/string.hpp ] || cat > include/Geode/c++stl/string.hpp <<'EOF'
-#pragma once
-#include <string>
-namespace gd { using string = std::string; }
-EOF
-
-          [ -f include/Geode/c++stl/aliastl.hpp ] || cat > include/Geode/c++stl/aliastl.hpp <<'EOF'
-#pragma once
-#include <string>
-#include <vector>
-#include <map>
-namespace gd { using string = std::string; template<typename T> using vector=std::vector<T>; template<typename K,typename V> using map=std::map<K,V>; }
-EOF
-
-          cp include/Geode/c++stl/aliastl.hpp include/Geode/c++stl/gnustl.hpp
-
-      - name: Setup MSVC Dev Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Build Windows DLL
-        shell: cmd
-        run: |
-          setlocal enabledelayedexpansion
-          set SRC=
-          for %%f in (src\*.cpp) do set SRC=!SRC! "%%f"
-          cl /EHsc /std:%CXX_STD% /DGEODE_PLATFORM_WINDOWS=1 /MD ^
-            /I include ^
-            %SRC% ^
-            /LD /link /OUT:build\xx0wq.video.importer.win64.dll
+      - run: geode build --release
 
       - uses: actions/upload-artifact@v4
         with:
-          name: win64-binary
-          path: build/xx0wq.video.importer.win64.dll
-
-  package:
-    needs: [build-windows]
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist/artifacts
-      - name: Get version from mod.json
-        id: get_version
-        run: |
-          VERSION=$(jq -r '.version' mod.json)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-      - name: Assemble package
-        run: |
-          mkdir -p dist/package
-          cp mod.json dist/package/
-          if [ -d resources ]; then cp -r resources dist/package/; fi
-          cp dist/artifacts/win64-binary/* dist/package/
-          cd dist/package
-          zip -r "video_importer_${{ steps.get_version.outputs.version }}.zip" .
-      - name: Upload packaged zip
-        uses: actions/upload-artifact@v4
-        with:
-          name: package
-          path: dist/package/video_importer_${{ steps.get_version.outputs.version }}.zip
+          name: video-importer
+          path: build/release/*.so
 
   release:
-    needs: package
+    needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
-          name: package
-          path: dist
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+          name: video-importer
+          path: release
+
+      - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.package.outputs.version }}
-          name: Video Importer v${{ needs.package.outputs.version }}
-          draft: false
-          prerelease: false
-          files: |
-            dist/video_importer_${{ needs.package.outputs.version }}.zip
+          files: release/*.so
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
