@@ -18,12 +18,12 @@ jobs:
       - name: Setup MSVC
         uses: microsoft/setup-msbuild@v1.1
 
-      # Install Scoop
+      # Install Scoop (bootstrap)
       - name: Install Scoop
         shell: powershell
         run: |
-          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-          iwr -useb get.scoop.sh | iex
+          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
 
       # Add extras bucket and install Geode CLI
       - name: Install Geode CLI via Scoop
