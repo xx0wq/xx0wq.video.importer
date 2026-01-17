@@ -18,22 +18,28 @@ jobs:
       - name: Setup MSVC
         uses: microsoft/setup-msbuild@v1.1
 
-      # Install Node.js (needed for Geode CLI)
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
+      # Install Scoop
+      - name: Install Scoop
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+          iwr -useb get.scoop.sh | iex
 
-      # Install Geode CLI directly from GitHub (fixes npm 404)
-      - name: Install Geode CLI
-        run: npm install -g github:geode-sdk/cli
+      # Add extras bucket and install Geode CLI
+      - name: Install Geode CLI via Scoop
+        shell: powershell
+        run: |
+          scoop bucket add extras
+          scoop install geode-sdk-cli
 
       # Install Geode SDK via CLI
       - name: Install Geode SDK
+        shell: powershell
         run: geode sdk install
 
       # Build mod (wraps cmake build)
       - name: Build Mod
+        shell: powershell
         run: geode build
 
       # Upload build artifacts (.geode / .dll)
