@@ -16,7 +16,7 @@ jobs:
       - name: Setup MSVC
         uses: microsoft/setup-msbuild@v1.1
 
-      # ⬆️ Moved GD download/extract step up here
+      # ⬆️ Download GD early
       - name: Download and Extract Geometry Dash
         shell: powershell
         run: |
@@ -44,7 +44,7 @@ jobs:
         shell: powershell
         run: |
           $gdExe = Join-Path $env:RUNNER_TEMP "gd\Geometry.Dash\Geometry.Dash.v24.07.2021\Geometry Dash\GeometryDash.exe"
-          $geodeDir = "$HOME\.geode"
+          $geodeDir = "$env:USERPROFILE\.geode"
           if (!(Test-Path $geodeDir)) {
             New-Item -ItemType Directory -Path $geodeDir -Force
           }
