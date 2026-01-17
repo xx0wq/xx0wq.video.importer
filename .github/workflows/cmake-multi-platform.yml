@@ -1,39 +1,44 @@
+name: Build Geode Mod
+
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
+    branches: [ main ]
+  pull_request:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
+      # Checkout your repository
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - uses: geode-sdk/setup-geode@v1
+      # Install MSVC + Windows SDK (via Visual Studio Build Tools)
+      - name: Setup MSVC
+        uses: microsoft/setup-msbuild@v1.1
+
+      # Install Node.js (needed for Geode CLI)
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          version: 4.10.0
+          node-version: '20'
 
-      - run: geode build --release
+      # Install Geode CLI
+      - name: Install Geode CLI
+        run: npm install -g geode-cli
 
-      - uses: actions/upload-artifact@v4
+      # Download Geode SDK (via CLI)
+      - name: Install Geode SDK
+        run: geode sdk install
+
+      # Build mod with Geode builder (wraps cmake)
+      - name: Build Mod
+        run: geode build
+
+      # Upload build artifacts (.geode / .dll / .so)
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
         with:
-          name: video-importer
-          path: build/release/*.so
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: video-importer
-          path: release
-
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: release/*.so
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: geode-mod
+          path: build/*
