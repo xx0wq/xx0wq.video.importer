@@ -33,6 +33,11 @@ jobs:
           scoop bucket add extras
           scoop install geode-sdk-cli
 
+      # Setup Geode profile (required before SDK install)
+      - name: Setup Geode Profile
+        shell: powershell
+        run: geode config setup --yes
+
       # Install Geode SDK via CLI
       - name: Install Geode SDK
         shell: powershell
