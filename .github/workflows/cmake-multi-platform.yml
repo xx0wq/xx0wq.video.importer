@@ -29,9 +29,32 @@ jobs:
           scoop bucket add extras
           scoop install geode-sdk-cli
 
-      # ⚠️ Profile setup must be done manually once in VSCode/local
-      # Remove the --yes flag, don't run this in CI
-      # Instead, run locally: geode config setup
+      - name: Download Geometry Dash
+        shell: powershell
+        run: |
+          $tempPath = "$env:RUNNER_TEMP\\gd"
+          New-Item -ItemType Directory -Path $tempPath -Force
+          Invoke-WebRequest -Uri "https://www.mediafire.com/file/vs6ob9x2ozfbed0/Geometry.Dash.zip/file" -OutFile "$tempPath\\GeometryDash.zip"
+          Expand-Archive -Path "$tempPath\\GeometryDash.zip" -DestinationPath $tempPath
+          $gdExe = Get-ChildItem $tempPath -Recurse -Filter "GeometryDash.exe" | Select-Object -First 1
+          echo "GD extracted to $($gdExe.FullName)"
+
+      - name: Setup Geode Profile
+        shell: powershell
+        run: |
+          $gdExe = Get-ChildItem "$env:RUNNER_TEMP\\gd" -Recurse -Filter "GeometryDash.exe" | Select-Object -First 1
+          $profile = @{
+            profiles = @(
+              @{
+                name      = "default"
+                developer = "xx0wq"
+                platform  = "win"
+                path      = $gdExe.FullName
+              }
+            )
+          } | ConvertTo-Json -Depth 3
+          $profile | Out-File -FilePath "$HOME\\.geode\\config.json" -Encoding utf8
+          echo "Geode profile created at $HOME\\.geode\\config.json"
 
       - name: Install Geode SDK
         shell: powershell
