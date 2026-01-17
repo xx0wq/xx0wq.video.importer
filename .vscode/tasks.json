@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Install Geode CLI",
+      "type": "shell",
+      "command": "npm install -g geode-cli",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Install Geode SDK",
+      "type": "shell",
+      "command": "geode sdk install",
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Build Geode Mod",
+      "type": "shell",
+      "command": "geode build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run Geometry Dash",
+      "type": "shell",
+      "command": "\"C:\\Program Files (x86)\\Steam\\steamapps\\common\\Geometry Dash\\GeometryDash.exe\"",
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      }
+    }
+  ]
+}
