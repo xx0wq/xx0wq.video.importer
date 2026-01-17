@@ -32,17 +32,17 @@ jobs:
       - name: Download Geometry Dash
         shell: powershell
         run: |
-          $tempPath = "$env:RUNNER_TEMP\\gd"
+          $tempPath = "$env:RUNNER_TEMP\gd"
           New-Item -ItemType Directory -Path $tempPath -Force
-          Invoke-WebRequest -Uri "https://www.mediafire.com/file/vs6ob9x2ozfbed0/Geometry.Dash.zip/file" -OutFile "$tempPath\\GeometryDash.zip"
-          Expand-Archive -Path "$tempPath\\GeometryDash.zip" -DestinationPath $tempPath
+          Invoke-WebRequest -Uri "https://download1338.mediafire.com/210q5ryy7p9gv07z5tLlzs2zoBmO-DqlrEtRXFAZohpIK66ILTuZL-rpcTgi7N28nzTYWqDbARW1fqFu-oPMRW396-Hg6dVKozVl2pcUDNii3Zg5PqX_yjChmte0c2Hyk1j725ik5DcHanpe0ghC_8kHMAqC7iBdNe3Dh7jvzozpzdPp/vs6ob9x2ozfbed0/Geometry.Dash.zip" -OutFile "$tempPath\GeometryDash.zip"
+          Expand-Archive -Path "$tempPath\GeometryDash.zip" -DestinationPath $tempPath
           $gdExe = Get-ChildItem $tempPath -Recurse -Filter "GeometryDash.exe" | Select-Object -First 1
           echo "GD extracted to $($gdExe.FullName)"
 
       - name: Setup Geode Profile
         shell: powershell
         run: |
-          $gdExe = Get-ChildItem "$env:RUNNER_TEMP\\gd" -Recurse -Filter "GeometryDash.exe" | Select-Object -First 1
+          $gdExe = Get-ChildItem "$env:RUNNER_TEMP\gd" -Recurse -Filter "GeometryDash.exe" | Select-Object -First 1
           $profile = @{
             profiles = @(
               @{
@@ -53,8 +53,8 @@ jobs:
               }
             )
           } | ConvertTo-Json -Depth 3
-          $profile | Out-File -FilePath "$HOME\\.geode\\config.json" -Encoding utf8
-          echo "Geode profile created at $HOME\\.geode\\config.json"
+          $profile | Out-File -FilePath "$HOME\.geode\config.json" -Encoding utf8
+          echo "Geode profile created at $HOME\.geode\config.json"
 
       - name: Install Geode SDK
         shell: powershell
