@@ -16,6 +16,17 @@ jobs:
       - name: Setup MSVC
         uses: microsoft/setup-msbuild@v1.1
 
+      # ⬆️ Moved GD download/extract step up here
+      - name: Download and Extract Geometry Dash
+        shell: powershell
+        run: |
+          $tempPath = "$env:RUNNER_TEMP\gd"
+          New-Item -ItemType Directory -Path $tempPath -Force
+          Invoke-WebRequest -Uri "https://download1338.mediafire.com/210q5ryy7p9gv07z5tLlzs2zoBmO-DqlrEtRXFAZohpIK66ILTuZL-rpcTgi7N28nzTYWqDbARW1fqFu-oPMRW396-Hg6dVKozVl2pcUDNii3Zg5PqX_yjChmte0c2Hyk1j725ik5DcHanpe0ghC_8kHMAqC7iBdNe3Dh7jvzozpzdPp/vs6ob9x2ozfbed0/Geometry.Dash.zip" -OutFile "$tempPath\GeometryDash.zip"
+          Expand-Archive -Path "$tempPath\GeometryDash.zip" -DestinationPath $tempPath
+          $gdExe = Join-Path $tempPath "Geometry.Dash\Geometry.Dash.v24.07.2021\Geometry Dash\GeometryDash.exe"
+          echo "GD executable path: $gdExe"
+
       - name: Install Scoop
         shell: powershell
         run: |
@@ -29,32 +40,26 @@ jobs:
           scoop bucket add extras
           scoop install geode-sdk-cli
 
-      - name: Download Geometry Dash
-        shell: powershell
-        run: |
-          $tempPath = "$env:RUNNER_TEMP\gd"
-          New-Item -ItemType Directory -Path $tempPath -Force
-          Invoke-WebRequest -Uri "https://download1338.mediafire.com/210q5ryy7p9gv07z5tLlzs2zoBmO-DqlrEtRXFAZohpIK66ILTuZL-rpcTgi7N28nzTYWqDbARW1fqFu-oPMRW396-Hg6dVKozVl2pcUDNii3Zg5PqX_yjChmte0c2Hyk1j725ik5DcHanpe0ghC_8kHMAqC7iBdNe3Dh7jvzozpzdPp/vs6ob9x2ozfbed0/Geometry.Dash.zip" -OutFile "$tempPath\GeometryDash.zip"
-          Expand-Archive -Path "$tempPath\GeometryDash.zip" -DestinationPath $tempPath
-          $gdExe = Get-ChildItem $tempPath -Recurse -Filter "GeometryDash.exe" | Select-Object -First 1
-          echo "GD extracted to $($gdExe.FullName)"
-
       - name: Setup Geode Profile
         shell: powershell
         run: |
-          $gdExe = Get-ChildItem "$env:RUNNER_TEMP\gd" -Recurse -Filter "GeometryDash.exe" | Select-Object -First 1
+          $gdExe = Join-Path $env:RUNNER_TEMP "gd\Geometry.Dash\Geometry.Dash.v24.07.2021\Geometry Dash\GeometryDash.exe"
+          $geodeDir = "$HOME\.geode"
+          if (!(Test-Path $geodeDir)) {
+            New-Item -ItemType Directory -Path $geodeDir -Force
+          }
           $profile = @{
             profiles = @(
               @{
                 name      = "default"
                 developer = "xx0wq"
                 platform  = "win"
-                path      = $gdExe.FullName
+                path      = $gdExe
               }
             )
           } | ConvertTo-Json -Depth 3
-          $profile | Out-File -FilePath "$HOME\.geode\config.json" -Encoding utf8
-          echo "Geode profile created at $HOME\.geode\config.json"
+          $profile | Out-File -FilePath "$geodeDir\config.json" -Encoding utf8
+          echo "Geode profile created at $geodeDir\config.json"
 
       - name: Install Geode SDK
         shell: powershell
