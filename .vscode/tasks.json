@@ -2,22 +2,24 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Install Geode CLI",
+      "label": "Install Scoop",
       "type": "shell",
-      "command": "npm install -g geode-cli",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
+      "command": "powershell -ExecutionPolicy RemoteSigned -Command \"Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression\""
+    },
+    {
+      "label": "Install Geode CLI via Scoop",
+      "type": "shell",
+      "command": "powershell -Command \"scoop bucket add extras; scoop install geode-sdk-cli\""
+    },
+    {
+      "label": "Setup Geode Profile",
+      "type": "shell",
+      "command": "geode config setup"
     },
     {
       "label": "Install Geode SDK",
       "type": "shell",
-      "command": "geode sdk install",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
+      "command": "geode sdk install"
     },
     {
       "label": "Build Geode Mod",
