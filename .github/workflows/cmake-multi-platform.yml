@@ -10,35 +10,28 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # Checkout your repository
       - name: Checkout
         uses: actions/checkout@v3
 
-      # Install MSVC + Windows SDK (via Visual Studio Build Tools)
       - name: Setup MSVC
         uses: microsoft/setup-msbuild@v1.1
 
-      # Install Node.js (needed for Geode CLI)
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # Install Geode CLI
       - name: Install Geode CLI
         run: npm install -g geode-cli
 
-      # Download Geode SDK (via CLI)
       - name: Install Geode SDK
         run: geode sdk install
 
-      # Build mod with Geode builder (wraps cmake)
       - name: Build Mod
         run: geode build
 
-      # Upload build artifacts (.geode / .dll / .so)
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: geode-mod
           path: build/*
